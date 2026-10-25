@@ -1,5 +1,5 @@
 
-name: Android APK Build
+name: Android APK Build and Tests
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  test-and-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,6 +28,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+
+      - name: Run unit tests
+        run: gradle :app:testDebugUnitTest
 
       - name: Build Debug APK
         run: gradle :app:assembleDebug
