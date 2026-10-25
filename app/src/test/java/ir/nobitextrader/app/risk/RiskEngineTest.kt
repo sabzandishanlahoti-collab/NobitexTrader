@@ -1,4 +1,3 @@
-
 package ir.nobitextrader.app.risk
 
 import org.junit.Assert.assertEquals
@@ -17,7 +16,7 @@ class RiskEngineTest {
         freeCapital: Double = 1000.0,
         openRisk: Double = 0.0,
         stopLossPct: Double = 1.0,
-        roundTripCostsPct: Double = 0.1,
+        estimatedRoundTripCostsPct: Double = 0.1,
         spreadPct: Double = 0.1,
         marketDataValid: Boolean = true,
         liquiditySufficient: Boolean = true,
@@ -29,7 +28,7 @@ class RiskEngineTest {
         freeCapitalUsd = freeCapital,
         openRiskUsd = openRisk,
         stopLossPct = stopLossPct,
-        roundTripCostsPct = roundTripCostsPct,
+        estimatedRoundTripCostsPct = estimatedRoundTripCostsPct,
         spreadPct = spreadPct,
         marketDataValid = marketDataValid,
         liquiditySufficient = liquiditySufficient,
