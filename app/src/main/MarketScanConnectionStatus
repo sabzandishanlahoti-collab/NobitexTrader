@@ -1,0 +1,33 @@
+
+package ir.nobitextrader.app.scanner
+
+data class MarketScanConnectionStatus(
+    val isConnected: Boolean,
+    val lastSuccessMillis: Long,
+    val lastError: String? = null
+) {
+    fun describe(): String {
+        return when {
+            isConnected -> "دریافت اطلاعات بازار موفق بود"
+            lastError != null -> "خطا: $lastError"
+            lastSuccessMillis == 0L -> "هنوز اتصال موفق ثبت نشده"
+            else -> "اتصال فعلی تأیید نشده"
+        }
+    }
+
+    companion object {
+        fun from(
+            results: List<MarketScanResult>,
+            timestampMillis: Long = System.currentTimeMillis()
+        ): MarketScanConnectionStatus {
+            val successful = results.any { it.success }
+            val error = results.firstOrNull { !it.success }?.error
+
+            return MarketScanConnectionStatus(
+                isConnected = successful,
+                lastSuccessMillis = if (successful) timestampMillis else 0L,
+                lastError = if (successful) null else error
+            )
+        }
+    }
+}
