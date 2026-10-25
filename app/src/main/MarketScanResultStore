@@ -1,0 +1,93 @@
+
+package ir.nobitextrader.app.scanner
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+
+class MarketScanResultStore(context: Context) {
+
+    private val preferences = context.getSharedPreferences(
+        "market_scan_results",
+        Context.MODE_PRIVATE
+    )
+
+    fun save(results: List<MarketScanResult>) {
+        val array = JSONArray()
+
+        results.forEach { result ->
+            array.put(
+                JSONObject().apply {
+                    put("symbol", result.symbol)
+                    put("lastPrice", result.lastPrice)
+                    put("bestBid", result.bestBid ?: JSONObject.NULL)
+                    put("bestAsk", result.bestAsk ?: JSONObject.NULL)
+                    put(
+                        "spreadPercent",
+                        result.spreadPercent ?: JSONObject.NULL
+                    )
+                    put("bidLiquidityTop5", result.bidLiquidityTop5)
+                    put("askLiquidityTop5", result.askLiquidityTop5)
+                    put("success", result.success)
+                    put("error", result.error ?: JSONObject.NULL)
+                }
+            )
+        }
+
+        preferences.edit()
+            .putString("results", array.toString())
+            .putLong("saved_at", System.currentTimeMillis())
+            .apply()
+    }
+
+    fun load(): List<MarketScanResult> {
+        val raw = preferences.getString("results", null)
+            ?: return emptyList()
+
+        return try {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+
+                    add(
+                        MarketScanResult(
+                            symbol = item.optString("symbol"),
+                            lastPrice = item.optDouble("lastPrice", 0.0),
+                            bestBid = item.numberOrNull("bestBid"),
+                            bestAsk = item.numberOrNull("bestAsk"),
+                            spreadPercent = item.numberOrNull("spreadPercent"),
+                            bidLiquidityTop5 = item.optDouble(
+                                "bidLiquidityTop5", 0.0
+                            ),
+                            askLiquidityTop5 = item.optDouble(
+                                "askLiquidityTop5", 0.0
+                            ),
+                            success = item.optBoolean("success", false),
+                            error = item.stringOrNull("error")
+                        )
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getSavedAtMillis(): Long =
+        preferences.getLong("saved_at", 0L)
+
+    fun clear() {
+        preferences.edit().clear().apply()
+    }
+
+    private fun JSONObject.numberOrNull(key: String): Double? {
+        if (isNull(key) || !has(key)) return null
+        return optDouble(key).takeIf { it.isFinite() }
+    }
+
+    private fun JSONObject.stringOrNull(key: String): String? {
+        if (isNull(key) || !has(key)) return null
+        return optString(key).takeIf { it.isNotBlank() }
+    }
+}
