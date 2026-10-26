@@ -51,22 +51,57 @@ object NobitexOrderBookApi {
     fun fetch(
         symbol: String = "BTCIRT"
     ): OrderBookSnapshot {
-        val normalizedSymbol = symbol.uppercase()
+        val normalizedSymbol = normalizeSymbol(symbol)
 
-        require(
-            normalizedSymbol.matches(Regex("[A-Z0-9]{3,20}"))
-        ) {
-            "Invalid market symbol"
+        val root = getJson("$BASE_URL$normalizedSymbol")
+
+        return parseSnapshot(normalizedSymbol, root)
+    }
+
+    /**
+     * Fetches all market order books through one public API request.
+     * No prices or market symbols are generated locally.
+     */
+    @Throws(IOException::class)
+    fun fetchAll(): List<OrderBookSnapshot> {
+        val root = getJson("${BASE_URL}all")
+
+        val markets = mutableListOf<OrderBookSnapshot>()
+        val keys = root.keys()
+
+        while (keys.hasNext()) {
+            val symbol = keys.next()
+
+            if (!symbol.matches(Regex("[A-Z0-9]{3,20}"))) {
+                continue
+            }
+
+            val market = root.optJSONObject(symbol) ?: continue
+
+            try {
+                markets.add(parseSnapshot(symbol, market))
+            } catch (_: IOException) {
+                // Skip malformed market data; do not fabricate a result.
+            }
         }
 
+        if (markets.isEmpty()) {
+            throw IOException(
+                "Nobitex returned no valid market order books"
+            )
+        }
+
+        return markets
+    }
+
+    private fun getJson(url: String): JSONObject {
         val connection =
-            URL("$BASE_URL$normalizedSymbol")
-                .openConnection() as HttpURLConnection
+            URL(url).openConnection() as HttpURLConnection
 
         try {
             connection.requestMethod = "GET"
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 10_000
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 20_000
             connection.setRequestProperty(
                 "Accept",
                 "application/json"
@@ -101,36 +136,45 @@ object NobitexOrderBookApi {
                 )
             }
 
-            val bids = parseLevels(
-                root.optJSONArray("bids"),
-                "bids"
-            )
-
-            val asks = parseLevels(
-                root.optJSONArray("asks"),
-                "asks"
-            )
-
-            val lastPrice = root.optString(
-                "lastTradePrice",
-                "0"
-            ).toDoubleOrNull() ?: 0.0
-
-            val lastUpdate = root.optLong(
-                "lastUpdate",
-                0L
-            )
-
-            return OrderBookSnapshot(
-                symbol = normalizedSymbol,
-                lastTradePrice = lastPrice,
-                lastUpdate = lastUpdate,
-                bids = bids,
-                asks = asks
-            )
+            return root
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun normalizeSymbol(symbol: String): String {
+        val normalized = symbol.trim().uppercase()
+
+        require(
+            normalized.matches(Regex("[A-Z0-9]{3,20}"))
+        ) {
+            "Invalid market symbol"
+        }
+
+        return normalized
+    }
+
+    private fun parseSnapshot(
+        symbol: String,
+        root: JSONObject
+    ): OrderBookSnapshot {
+        val bids = parseLevels(root.optJSONArray("bids"), "bids")
+        val asks = parseLevels(root.optJSONArray("asks"), "asks")
+
+        val lastPrice = root.optString(
+            "lastTradePrice",
+            ""
+        ).toDoubleOrNull() ?: 0.0
+
+        val lastUpdate = root.optLong("lastUpdate", 0L)
+
+        return OrderBookSnapshot(
+            symbol = symbol,
+            lastTradePrice = lastPrice,
+            lastUpdate = lastUpdate,
+            bids = bids,
+            asks = asks
+        )
     }
 
     private fun parseLevels(
