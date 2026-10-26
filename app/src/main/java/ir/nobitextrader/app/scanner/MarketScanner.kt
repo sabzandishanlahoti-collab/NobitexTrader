@@ -1,6 +1,7 @@
 package ir.nobitextrader.app.scanner
 
 import ir.nobitextrader.app.data.NobitexOrderBookApi
+import kotlinx.coroutines.CancellationException
 
 data class MarketScanResult(
     val symbol: String,
@@ -32,8 +33,8 @@ object MarketScanner {
     fun scan(
         symbols: List<String> = defaultMarkets
     ): List<MarketScanResult> {
-        require(symbols.size <= 50) {
-            "Scan is limited to 50 markets per call"
+        require(symbols.size <= 500) {
+            "Scan is limited to 500 markets per call"
         }
 
         val results = mutableListOf<MarketScanResult>()
@@ -44,17 +45,7 @@ object MarketScanner {
 
             if (!symbol.matches(Regex("[A-Z0-9]{3,20}"))) {
                 results.add(
-                    MarketScanResult(
-                        symbol = symbol,
-                        lastPrice = 0.0,
-                        bestBid = null,
-                        bestAsk = null,
-                        spreadPercent = null,
-                        bidLiquidityTop5 = 0.0,
-                        askLiquidityTop5 = 0.0,
-                        success = false,
-                        error = "Invalid market symbol"
-                    )
+                    failedResult(symbol, "Invalid market symbol")
                 )
                 continue
             }
@@ -63,36 +54,14 @@ object MarketScanner {
 
             try {
                 val book = NobitexOrderBookApi.fetch(symbol)
-
-                results.add(
-                    MarketScanResult(
-                        symbol = book.symbol,
-                        lastPrice = book.lastTradePrice,
-                        bestBid = book.bestBid,
-                        bestAsk = book.bestAsk,
-                        spreadPercent = book.spreadPercent,
-                        bidLiquidityTop5 = book.bids
-                            .take(5)
-                            .sumOf { it.amount },
-                        askLiquidityTop5 = book.asks
-                            .take(5)
-                            .sumOf { it.amount },
-                        success = true
-                    )
-                )
+                results.add(book.toScanResult())
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 results.add(
-                    MarketScanResult(
-                        symbol = symbol,
-                        lastPrice = 0.0,
-                        bestBid = null,
-                        bestAsk = null,
-                        spreadPercent = null,
-                        bidLiquidityTop5 = 0.0,
-                        askLiquidityTop5 = 0.0,
-                        success = false,
-                        error = e.message
-                            ?: "Unknown market data error"
+                    failedResult(
+                        symbol,
+                        e.message ?: "Unknown market data error"
                     )
                 )
             }
@@ -100,6 +69,59 @@ object MarketScanner {
 
         return results
     }
+
+    fun scanAll(): List<MarketScanResult> {
+        return try {
+            NobitexOrderBookApi.fetchAll()
+                .distinctBy { it.symbol }
+                .map { it.toScanResult() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                e.message ?: "Failed to fetch all Nobitex order books",
+                e
+            )
+        }
+    }
+
+    private fun ir.nobitextrader.app.data.OrderBookSnapshot
+        .toScanResult(): MarketScanResult {
+        return MarketScanResult(
+            symbol = symbol,
+            lastPrice = lastTradePrice,
+            bestBid = bestBid,
+            bestAsk = bestAsk,
+            spreadPercent = spreadPercent,
+            bidLiquidityTop5 = bids
+                .take(5)
+                .sumOf { it.amount },
+            askLiquidityTop5 = asks
+                .take(5)
+                .sumOf { it.amount },
+            success = bids.isNotEmpty() && asks.isNotEmpty(),
+            error = if (bids.isEmpty() || asks.isEmpty()) {
+                "Order book has no valid bid or ask levels"
+            } else {
+                null
+            }
+        )
+    }
+
+    private fun failedResult(
+        symbol: String,
+        message: String
+    ) = MarketScanResult(
+        symbol = symbol,
+        lastPrice = 0.0,
+        bestBid = null,
+        bestAsk = null,
+        spreadPercent = null,
+        bidLiquidityTop5 = 0.0,
+        askLiquidityTop5 = 0.0,
+        success = false,
+        error = message
+    )
 
     fun rankBySpread(
         results: List<MarketScanResult>
