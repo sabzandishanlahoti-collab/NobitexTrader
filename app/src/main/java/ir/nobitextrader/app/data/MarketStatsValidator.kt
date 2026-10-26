@@ -39,6 +39,12 @@ object MarketStatsValidator {
             errors += "Daily high must be finite and positive"
         }
 
+        val validDailyRange =
+            stats.dayLow.isFinite() &&
+            stats.dayHigh.isFinite() &&
+            stats.dayLow > 0.0 &&
+            stats.dayHigh >= stats.dayLow
+
         if (stats.dayLow.isFinite() &&
             stats.dayHigh.isFinite() &&
             stats.dayLow > 0.0 &&
@@ -46,6 +52,15 @@ object MarketStatsValidator {
             stats.dayLow > stats.dayHigh
         ) {
             errors += "Daily low exceeds daily high"
+        }
+
+        if (validDailyRange &&
+            stats.latest.isFinite() &&
+            stats.latest > 0.0 &&
+            (stats.latest < stats.dayLow ||
+             stats.latest > stats.dayHigh)
+        ) {
+            errors += "Latest price is outside the daily range"
         }
 
         if (!stats.dayChange.isFinite()) {
