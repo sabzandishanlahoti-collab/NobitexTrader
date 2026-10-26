@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -55,7 +56,10 @@ fun MarketScannerScreen(
                 enabled = !state.isScanning,
                 modifier = Modifier.weight(1f)
             ) {
-                Text(if (state.isScanning) "در حال اسکن..." else "اسکن همه بازارها")
+                Text(
+                    if (state.isScanning) "در حال اسکن..."
+                    else "اسکن همه بازارها"
+                )
             }
 
             OutlinedButton(
@@ -63,6 +67,73 @@ fun MarketScannerScreen(
                 enabled = !state.isScanning && state.results.isNotEmpty()
             ) {
                 Text("پاک‌کردن")
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = if (state.autoRefreshEnabled) {
+                        "به‌روزرسانی خودکار روشن است"
+                    } else {
+                        "به‌روزرسانی خودکار خاموش است"
+                    },
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                Text(
+                    text = "فاصله اسکن: ${
+                        state.refreshIntervalMs / 1000
+                    } ثانیه"
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.setRefreshInterval(30_000L)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("۳۰ ثانیه")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.setRefreshInterval(60_000L)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("۶۰ ثانیه")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.setRefreshInterval(300_000L)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("۵ دقیقه")
+                    }
+                }
+
+                Button(
+                    onClick = { viewModel.toggleAutoRefresh() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (state.autoRefreshEnabled) {
+                            "خاموش کردن به‌روزرسانی خودکار"
+                        } else {
+                            "روشن کردن به‌روزرسانی خودکار"
+                        }
+                    )
+                }
             }
         }
 
@@ -154,7 +225,7 @@ fun MarketScannerScreen(
         }
 
         Text(
-            text = "نتایج نمایش‌داده‌شده: ${visibleResults.size} از ${state.totalCount}"
+            text = "نمایش ${visibleResults.size} از ${state.totalCount} بازار"
         )
 
         state.errorMessage?.let { message ->
@@ -170,7 +241,7 @@ fun MarketScannerScreen(
                 Text("در حال دریافت اطلاعات بازار...")
                 Spacer(modifier = Modifier.weight(1f))
                 OutlinedButton(onClick = { viewModel.cancelScan() }) {
-                    Text("توقف")
+                    Text("توقف اسکن فعلی")
                 }
             }
         }
