@@ -3,14 +3,22 @@ package ir.nobitextrader.app.scanner
 
 import ir.nobitextrader.app.data.NobitexOrderBookApi
 import ir.nobitextrader.app.data.OrderBookSnapshot
-import kotlinx.coroutines.CancellationException
+import java.io.IOException
+import java.util.Locale
+import kotlin.math.max
+
+enum class MarketSortMode {
+    SPREAD_LOW_TO_HIGH,
+    BID_LIQUIDITY_HIGH_TO_LOW,
+    ASK_LIQUIDITY_HIGH_TO_LOW
+}
 
 data class MarketScanResult(
     val symbol: String,
     val lastPrice: Double,
-    val bestBid: Double?,
-    val bestAsk: Double?,
-    val spreadPercent: Double?,
+    val bestBid: Double,
+    val bestAsk: Double,
+    val spreadPercent: Double,
     val bidLiquidityTop5: Double,
     val askLiquidityTop5: Double,
     val success: Boolean,
@@ -19,8 +27,6 @@ data class MarketScanResult(
 
 object MarketScanner {
 
-    // Used only when a specific list of symbols is requested.
-    // scanAll() obtains the actual markets from Nobitex.
     val defaultMarkets: List<String> = listOf(
         "BTCIRT",
         "ETHIRT",
@@ -34,148 +40,120 @@ object MarketScanner {
         "BNBIRT"
     )
 
-    fun scan(
+    suspend fun scan(
         symbols: List<String> = defaultMarkets
     ): List<MarketScanResult> {
-        require(symbols.size <= 500) {
-            "Scan is limited to 500 markets per call"
+        val normalizedSymbols = symbols
+            .map { it.trim().uppercase(Locale.ROOT) }
+            .filter { it.matches(Regex("[A-Z0-9]{3,20}")) }
+            .distinct()
+
+        if (normalizedSymbols.isEmpty()) {
+            return emptyList()
         }
 
-        val results = mutableListOf<MarketScanResult>()
-        val seen = mutableSetOf<String>()
-
-        for (rawSymbol in symbols) {
-            val symbol = rawSymbol.trim().uppercase()
-
-            if (!symbol.matches(Regex("[A-Z0-9]{3,20}"))) {
-                results.add(
-                    failedResult(symbol, "Invalid market symbol")
-                )
-                continue
-            }
-
-            if (!seen.add(symbol)) continue
-
+        return normalizedSymbols.map { symbol ->
             try {
-                results.add(
-                    NobitexOrderBookApi.fetch(symbol).toScanResult()
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                results.add(
-                    failedResult(
-                        symbol,
-                        e.message ?: "Unknown market data error"
-                    )
+                toScanResult(NobitexOrderBookApi.fetch(symbol))
+            } catch (exception: Exception) {
+                MarketScanResult(
+                    symbol = symbol,
+                    lastPrice = 0.0,
+                    bestBid = 0.0,
+                    bestAsk = 0.0,
+                    spreadPercent = 0.0,
+                    bidLiquidityTop5 = 0.0,
+                    askLiquidityTop5 = 0.0,
+                    success = false,
+                    error = exception.message ?: "خطای دریافت اطلاعات بازار"
                 )
             }
+        }
+    }
+
+    suspend fun scanAll(): List<MarketScanResult> {
+        val snapshots = NobitexOrderBookApi.fetchAll()
+
+        val results = snapshots
+            .filter { it.symbol.matches(Regex("[A-Z0-9]{3,20}")) }
+            .distinctBy { it.symbol }
+            .map { snapshot -> toScanResult(snapshot) }
+
+        if (results.isEmpty()) {
+            throw IOException("اطلاعات معتبر بازار از نوبیتکس دریافت نشد.")
         }
 
         return results
     }
 
-    /**
-     * Retrieves the market list from Nobitex's public all-order-books
-     * endpoint. It does not treat the defaultMarkets list as all markets.
-     */
-    fun scanAll(): List<MarketScanResult> {
-        val snapshots = try {
-            NobitexOrderBookApi.fetchAll()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            throw IllegalStateException(
-                e.message ?: "Failed to fetch Nobitex order books",
-                e
-            )
+    fun sortResults(
+        results: List<MarketScanResult>,
+        mode: MarketSortMode
+    ): List<MarketScanResult> {
+        val successful = results.filter { it.success }
+        val failed = results.filterNot { it.success }
+
+        val sortedSuccessful = when (mode) {
+            MarketSortMode.SPREAD_LOW_TO_HIGH ->
+                successful.sortedBy { it.spreadPercent }
+
+            MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW ->
+                successful.sortedByDescending { it.bidLiquidityTop5 }
+
+            MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW ->
+                successful.sortedByDescending { it.askLiquidityTop5 }
         }
 
-        val uniqueSnapshots = snapshots
-            .filter {
-                it.symbol.matches(Regex("[A-Z0-9]{3,20}"))
-            }
-            .distinctBy { it.symbol }
-
-        if (uniqueSnapshots.isEmpty()) {
-            throw IllegalStateException(
-                "Nobitex returned no valid market order books"
-            )
-        }
-
-        return uniqueSnapshots.map { snapshot ->
-            snapshot.toScanResult()
-        }
+        return sortedSuccessful + failed
     }
 
-    private fun OrderBookSnapshot.toScanResult(): MarketScanResult {
-        val bid = bestBid
-        val ask = bestAsk
+    fun successfulCount(results: List<MarketScanResult>): Int =
+        results.count { it.success }
 
-        val validBook =
-            bids.isNotEmpty() &&
-            asks.isNotEmpty() &&
-            bid != null &&
-            ask != null &&
-            bid > 0.0 &&
-            ask > 0.0 &&
-            ask >= bid
+    fun failedCount(results: List<MarketScanResult>): Int =
+        results.count { !it.success }
+
+    private fun toScanResult(
+        snapshot: OrderBookSnapshot
+    ): MarketScanResult {
+        val bids = snapshot.bids
+            .filter { it.price > 0.0 && it.amount >= 0.0 }
+            .sortedByDescending { it.price }
+
+        val asks = snapshot.asks
+            .filter { it.price > 0.0 && it.amount >= 0.0 }
+            .sortedBy { it.price }
+
+        val bestBid = bids.firstOrNull()?.price ?: 0.0
+        val bestAsk = asks.firstOrNull()?.price ?: 0.0
+
+        val validBook = bestBid > 0.0 &&
+            bestAsk > 0.0 &&
+            bestAsk >= bestBid
+
+        val spread = if (validBook) {
+            ((bestAsk - bestBid) / bestBid) * 100.0
+        } else {
+            0.0
+        }
+
+        val bidLiquidity = bids.take(5).sumOf {
+            it.price * it.amount
+        }
+
+        val askLiquidity = asks.take(5).sumOf {
+            it.price * it.amount
+        }
 
         return MarketScanResult(
-            symbol = symbol,
-            lastPrice = lastTradePrice,
-            bestBid = bid,
-            bestAsk = ask,
-            spreadPercent = if (validBook) spreadPercent else null,
-            bidLiquidityTop5 = bids
-                .take(5)
-                .sumOf { it.amount },
-            askLiquidityTop5 = asks
-                .take(5)
-                .sumOf { it.amount },
-            success = validBook,
-            error = if (validBook) {
-                null
-            } else {
-                "Order book has missing or invalid bid/ask levels"
-            }
+            symbol = snapshot.symbol,
+            lastPrice = snapshot.lastTradePrice,
+            bestBid = bestBid,
+            bestAsk = bestAsk,
+            spreadPercent = max(0.0, spread),
+            bidLiquidityTop5 = bidLiquidity,
+            askLiquidityTop5 = askLiquidity,
+            success = validBook
         )
     }
-
-    private fun failedResult(
-        symbol: String,
-        message: String
-    ) = MarketScanResult(
-        symbol = symbol,
-        lastPrice = 0.0,
-        bestBid = null,
-        bestAsk = null,
-        spreadPercent = null,
-        bidLiquidityTop5 = 0.0,
-        askLiquidityTop5 = 0.0,
-        success = false,
-        error = message
-    )
-
-    fun rankBySpread(
-        results: List<MarketScanResult>
-    ): List<MarketScanResult> {
-        return results
-            .filter {
-                it.success &&
-                    it.spreadPercent != null &&
-                    it.spreadPercent >= 0.0 &&
-                    it.bestBid != null &&
-                    it.bestAsk != null
-            }
-            .sortedBy { it.spreadPercent }
-    }
-
-    fun successfulCount(
-        results: List<MarketScanResult>
-    ): Int = results.count { it.success }
-
-    fun failedCount(
-        results: List<MarketScanResult>
-    ): Int = results.count { !it.success }
 }
