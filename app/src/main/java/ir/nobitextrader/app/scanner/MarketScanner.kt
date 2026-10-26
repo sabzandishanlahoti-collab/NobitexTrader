@@ -5,12 +5,12 @@ import ir.nobitextrader.app.data.NobitexOrderBookApi
 import ir.nobitextrader.app.data.OrderBookSnapshot
 import java.io.IOException
 import java.util.Locale
-import kotlin.math.max
 
 enum class MarketSortMode {
     SPREAD_LOW_TO_HIGH,
     BID_LIQUIDITY_HIGH_TO_LOW,
-    ASK_LIQUIDITY_HIGH_TO_LOW
+    ASK_LIQUIDITY_HIGH_TO_LOW,
+    BALANCED_PRIORITY
 }
 
 data class MarketScanResult(
@@ -27,35 +27,23 @@ data class MarketScanResult(
 
 object MarketScanner {
 
-    val defaultMarkets: List<String> = listOf(
-        "BTCIRT",
-        "ETHIRT",
-        "LTCIRT",
-        "XRPIRT",
-        "TRXIRT",
-        "DOGEIRT",
-        "ADAIRT",
-        "LINKIRT",
-        "ETCIRT",
-        "BNBIRT"
+    val defaultMarkets = listOf(
+        "BTCIRT", "ETHIRT", "LTCIRT", "XRPIRT", "TRXIRT",
+        "DOGEIRT", "ADAIRT", "LINKIRT", "ETCIRT", "BNBIRT"
     )
 
     suspend fun scan(
         symbols: List<String> = defaultMarkets
     ): List<MarketScanResult> {
-        val normalizedSymbols = symbols
+        val validSymbols = symbols
             .map { it.trim().uppercase(Locale.ROOT) }
             .filter { it.matches(Regex("[A-Z0-9]{3,20}")) }
             .distinct()
 
-        if (normalizedSymbols.isEmpty()) {
-            return emptyList()
-        }
-
-        return normalizedSymbols.map { symbol ->
+        return validSymbols.map { symbol ->
             try {
                 toScanResult(NobitexOrderBookApi.fetch(symbol))
-            } catch (exception: Exception) {
+            } catch (e: Exception) {
                 MarketScanResult(
                     symbol = symbol,
                     lastPrice = 0.0,
@@ -65,22 +53,20 @@ object MarketScanner {
                     bidLiquidityTop5 = 0.0,
                     askLiquidityTop5 = 0.0,
                     success = false,
-                    error = exception.message ?: "خطای دریافت اطلاعات بازار"
+                    error = e.message ?: "خطای دریافت اطلاعات بازار"
                 )
             }
         }
     }
 
     suspend fun scanAll(): List<MarketScanResult> {
-        val snapshots = NobitexOrderBookApi.fetchAll()
-
-        val results = snapshots
+        val results = NobitexOrderBookApi.fetchAll()
             .filter { it.symbol.matches(Regex("[A-Z0-9]{3,20}")) }
             .distinctBy { it.symbol }
-            .map { snapshot -> toScanResult(snapshot) }
+            .map { toScanResult(it) }
 
         if (results.isEmpty()) {
-            throw IOException("اطلاعات معتبر بازار از نوبیتکس دریافت نشد.")
+            throw IOException("اطلاعات معتبر بازار دریافت نشد.")
         }
 
         return results
@@ -93,7 +79,7 @@ object MarketScanner {
         val successful = results.filter { it.success }
         val failed = results.filterNot { it.success }
 
-        val sortedSuccessful = when (mode) {
+        val sorted = when (mode) {
             MarketSortMode.SPREAD_LOW_TO_HIGH ->
                 successful.sortedBy { it.spreadPercent }
 
@@ -102,26 +88,79 @@ object MarketScanner {
 
             MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW ->
                 successful.sortedByDescending { it.askLiquidityTop5 }
+
+            MarketSortMode.BALANCED_PRIORITY ->
+                sortByBalancedPriority(successful)
         }
 
-        return sortedSuccessful + failed
+        return sorted + failed
     }
 
-    fun successfulCount(results: List<MarketScanResult>): Int =
+    private fun sortByBalancedPriority(
+        results: List<MarketScanResult>
+    ): List<MarketScanResult> {
+        if (results.size < 2) return results
+
+        val minSpread = results.minOf { it.spreadPercent }
+        val maxSpread = results.maxOf { it.spreadPercent }
+        val maxBid = results.maxOf { it.bidLiquidityTop5 }
+        val maxAsk = results.maxOf { it.askLiquidityTop5 }
+
+        fun normalizedLowerIsBetter(
+            value: Double,
+            min: Double,
+            max: Double
+        ): Double {
+            if (max <= min) return 1.0
+            return (max - value) / (max - min)
+        }
+
+        fun normalizedHigherIsBetter(
+            value: Double,
+            max: Double
+        ): Double {
+            if (max <= 0.0) return 0.0
+            return (value / max).coerceIn(0.0, 1.0)
+        }
+
+        return results.sortedByDescending { result ->
+            val spreadScore = normalizedLowerIsBetter(
+                result.spreadPercent,
+                minSpread,
+                maxSpread
+            )
+            val bidScore = normalizedHigherIsBetter(
+                result.bidLiquidityTop5,
+                maxBid
+            )
+            val askScore = normalizedHigherIsBetter(
+                result.askLiquidityTop5,
+                maxAsk
+            )
+
+            (spreadScore * 0.50) +
+                (bidScore * 0.25) +
+                (askScore * 0.25)
+        }
+    }
+
+    fun successfulCount(results: List<MarketScanResult>) =
         results.count { it.success }
 
-    fun failedCount(results: List<MarketScanResult>): Int =
+    fun failedCount(results: List<MarketScanResult>) =
         results.count { !it.success }
 
     private fun toScanResult(
         snapshot: OrderBookSnapshot
     ): MarketScanResult {
         val bids = snapshot.bids
-            .filter { it.price > 0.0 && it.amount >= 0.0 }
+            .filter { it.price.isFinite() && it.amount.isFinite() &&
+                it.price > 0.0 && it.amount >= 0.0 }
             .sortedByDescending { it.price }
 
         val asks = snapshot.asks
-            .filter { it.price > 0.0 && it.amount >= 0.0 }
+            .filter { it.price.isFinite() && it.amount.isFinite() &&
+                it.price > 0.0 && it.amount >= 0.0 }
             .sortedBy { it.price }
 
         val bestBid = bids.firstOrNull()?.price ?: 0.0
@@ -131,18 +170,10 @@ object MarketScanner {
             bestAsk > 0.0 &&
             bestAsk >= bestBid
 
-        val spread = if (validBook) {
+        val spreadPercent = if (validBook) {
             ((bestAsk - bestBid) / bestBid) * 100.0
         } else {
             0.0
-        }
-
-        val bidLiquidity = bids.take(5).sumOf {
-            it.price * it.amount
-        }
-
-        val askLiquidity = asks.take(5).sumOf {
-            it.price * it.amount
         }
 
         return MarketScanResult(
@@ -150,9 +181,13 @@ object MarketScanner {
             lastPrice = snapshot.lastTradePrice,
             bestBid = bestBid,
             bestAsk = bestAsk,
-            spreadPercent = max(0.0, spread),
-            bidLiquidityTop5 = bidLiquidity,
-            askLiquidityTop5 = askLiquidity,
+            spreadPercent = spreadPercent.coerceAtLeast(0.0),
+            bidLiquidityTop5 = bids.take(5).sumOf {
+                it.price * it.amount
+            },
+            askLiquidityTop5 = asks.take(5).sumOf {
+                it.price * it.amount
+            },
             success = validBook
         )
     }
