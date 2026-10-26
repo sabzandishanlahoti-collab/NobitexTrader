@@ -14,17 +14,19 @@ class MarketScannerTest {
         bidLiquidity: Double,
         askLiquidity: Double,
         success: Boolean = true
-    ) = MarketScanResult(
-        symbol = symbol,
-        lastPrice = 100.0,
-        bestBid = 99.0,
-        bestAsk = 101.0,
-        spreadPercent = spread,
-        bidLiquidityTop5 = bidLiquidity,
-        askLiquidityTop5 = askLiquidity,
-        success = success,
-        error = if (success) null else "Invalid market data"
-    )
+    ): MarketScanResult {
+        return MarketScanResult(
+            symbol = symbol,
+            lastPrice = 100.0,
+            bestBid = 99.0,
+            bestAsk = 101.0,
+            spreadPercent = spread,
+            bidLiquidityTop5 = bidLiquidity,
+            askLiquidityTop5 = askLiquidity,
+            success = success,
+            error = if (success) null else "Invalid market data"
+        )
+    }
 
     @Test
     fun spreadSortPlacesLowestSpreadFirst() {
@@ -109,7 +111,7 @@ class MarketScannerTest {
             result("BADIRT", 0.0, 0.0, 0.0, success = false)
         )
 
-        assertEquals(2, MarketScanner.successCount(input))
-        assertEquals(1, MarketScanner.failureCount(input))
+        assertEquals(2, input.count { it.success })
+        assertEquals(1, input.count { !it.success })
     }
 }
