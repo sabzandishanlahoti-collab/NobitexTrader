@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -66,40 +67,54 @@ fun MarketScannerScreen(
             style = MaterialTheme.typography.titleMedium
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            SortButton(
-                text = "اختلاف کمتر",
-                selected = state.sortMode == MarketSortMode.SPREAD_LOW_TO_HIGH,
-                modifier = Modifier.weight(1f),
-                onClick = {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                SortButton(
+                    text = "ترکیبی",
+                    selected = state.sortMode == MarketSortMode.BALANCED_PRIORITY,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    viewModel.setSortMode(MarketSortMode.BALANCED_PRIORITY)
+                }
+
+                SortButton(
+                    text = "اختلاف کمتر",
+                    selected = state.sortMode == MarketSortMode.SPREAD_LOW_TO_HIGH,
+                    modifier = Modifier.weight(1f)
+                ) {
                     viewModel.setSortMode(MarketSortMode.SPREAD_LOW_TO_HIGH)
                 }
-            )
+            }
 
-            SortButton(
-                text = "تقاضای بیشتر",
-                selected = state.sortMode == MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW,
-                modifier = Modifier.weight(1f),
-                onClick = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                SortButton(
+                    text = "تقاضای بیشتر",
+                    selected = state.sortMode ==
+                        MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW,
+                    modifier = Modifier.weight(1f)
+                ) {
                     viewModel.setSortMode(
                         MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW
                     )
                 }
-            )
 
-            SortButton(
-                text = "عرضه بیشتر",
-                selected = state.sortMode == MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW,
-                modifier = Modifier.weight(1f),
-                onClick = {
+                SortButton(
+                    text = "عرضه بیشتر",
+                    selected = state.sortMode ==
+                        MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW,
+                    modifier = Modifier.weight(1f)
+                ) {
                     viewModel.setSortMode(
                         MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW
                     )
                 }
-            )
+            }
         }
 
         Text(
@@ -116,11 +131,9 @@ fun MarketScannerScreen(
         }
 
         if (state.isScanning) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CircularProgressIndicator()
-                Text("در حال دریافت داده‌های واقعی بازار...")
+                Text("در حال دریافت اطلاعات بازار...")
                 Spacer(modifier = Modifier.weight(1f))
                 OutlinedButton(onClick = { viewModel.cancelScan() }) {
                     Text("توقف")
@@ -136,7 +149,7 @@ fun MarketScannerScreen(
                 items = state.results,
                 key = { "${it.symbol}_${it.success}" }
             ) { result ->
-                MarketResultCard(result = result)
+                MarketResultCard(result)
             }
         }
     }
@@ -150,26 +163,18 @@ private fun SortButton(
     onClick: () -> Unit
 ) {
     if (selected) {
-        Button(
-            onClick = onClick,
-            modifier = modifier
-        ) {
+        Button(onClick = onClick, modifier = modifier) {
             Text(text)
         }
     } else {
-        OutlinedButton(
-            onClick = onClick,
-            modifier = modifier
-        ) {
+        OutlinedButton(onClick = onClick, modifier = modifier) {
             Text(text)
         }
     }
 }
 
 @Composable
-private fun MarketResultCard(
-    result: MarketScanResult
-) {
+private fun MarketResultCard(result: MarketScanResult) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
