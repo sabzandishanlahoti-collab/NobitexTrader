@@ -1,199 +1,109 @@
-package ir.nobitextrader.app
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModelProvider
+package ir.nobitextrader.app.data
+
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import ir.nobitextrader.app.data.MarketStats
-import ir.nobitextrader.app.data.NobitexMarketApi
-import ir.nobitextrader.app.scanner.MarketScannerScreen
-import ir.nobitextrader.app.scanner.MarketScannerViewModel
+import org.json.JSONObject
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
 
-class MainActivity : ComponentActivity() {
+data class MarketStats(
+    val market: String,
+    val latest: Double,
+    val bestBuy: Double,
+    val bestSell: Double,
+    val dayLow: Double,
+    val dayHigh: Double,
+    val dayChange: Double,
+    val isClosed: Boolean
+)
 
-    private val scannerViewModel: MarketScannerViewModel by lazy {
-        ViewModelProvider(this)[MarketScannerViewModel::class.java]
-    }
+object NobitexMarketApi {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    private const val STATS_URL =
+        "https://apiv2.nobitex.ir/market/stats"
 
-        setContent {
-            MaterialTheme {
-                val scope = rememberCoroutineScope()
+    suspend fun fetchMarketStats(): MarketStats =
+        withContext(Dispatchers.IO) {
+            var connection: HttpURLConnection? = null
 
-                val result = remember {
-                    mutableStateOf<MarketStats?>(null)
+            try {
+                connection = (URL(STATS_URL).openConnection()
+                    as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 15000
+                    readTimeout = 15000
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty(
+                        "User-Agent",
+                        "NobitexTrader-Android"
+                    )
                 }
-                val loading = remember {
-                    mutableStateOf(false)
-                }
-                val error = remember {
-                    mutableStateOf<String?>(null)
-                }
-                val showScanner = remember {
-                    mutableStateOf(false)
+
+                val status = connection.responseCode
+                val stream = if (status in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
                 }
 
-                BackHandler(enabled = showScanner.value) {
-                    showScanner.value = false
+                val response = stream?.bufferedReader()?.use {
+                    it.readText()
+                } ?: throw IOException(
+                    "پاسخ خالی از نوبیتکس؛ HTTP $status"
+                )
+
+                if (status !in 200..299) {
+                    throw IOException(
+                        "خطای HTTP $status هنگام اتصال به نوبیتکس"
+                    )
                 }
 
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    if (showScanner.value) {
-                        Column(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Button(
-                                onClick = {
-                                    showScanner.value = false
-                                },
-                                modifier = Modifier.padding(12.dp)
-                            ) {
-                                Text("بازگشت به صفحه اصلی")
-                            }
+                val root = JSONObject(response)
+                val stats = root.optJSONObject("stats")
+                    ?: throw IOException(
+                        "ساختار پاسخ بازار معتبر نیست"
+                    )
 
-                            MarketScannerScreen(
-                                viewModel = scannerViewModel,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(24.dp),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "NobitexTrader",
-                                fontSize = 28.sp
-                            )
+                val marketData = stats.optJSONObject("btc-irt")
+                    ?: throw IOException(
+                        "بازار BTC/IRT در پاسخ پیدا نشد"
+                    )
 
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = "ربات معاملات نوبیتکس",
-                                fontSize = 21.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Button(
-                                enabled = !loading.value,
-                                onClick = {
-                                    scope.launch {
-                                        loading.value = true
-                                        error.value = null
-
-                                        try {
-                                            result.value = withContext(
-                                                Dispatchers.IO
-                                            ) {
-                                                NobitexMarketApi.fetchMarketStats()
-                                            }
-                                        } catch (e: Exception) {
-                                            error.value = e.message
-                                                ?: "خطای نامشخص در دریافت اطلاعات"
-                                        } finally {
-                                            loading.value = false
-                                        }
-                                    }
-                                }
-                            ) {
-                                Text(
-                                    if (loading.value) {
-                                        "در حال دریافت..."
-                                    } else {
-                                        "دریافت قیمت واقعی BTC/IRT"
-                                    }
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Button(
-                                onClick = {
-                                    showScanner.value = true
-                                }
-                            ) {
-                                Text("ورود به اسکنر همه بازارها")
-                            }
-
-                            Spacer(modifier = Modifier.height(20.dp))
-
-                            if (loading.value) {
-                                CircularProgressIndicator()
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text("در حال اتصال به نوبیتکس...")
-                            }
-
-                            result.value?.let { stats ->
-                                Text("وضعیت دریافت: موفق")
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text("بازار: ${stats.market}")
-                                Text("آخرین قیمت: ${stats.latest} ریال")
-                                Text("بهترین قیمت خرید: ${stats.bestBuy} ریال")
-                                Text("بهترین قیمت فروش: ${stats.bestSell} ریال")
-                                Text("کمترین قیمت روز: ${stats.dayLow} ریال")
-                                Text("بیشترین قیمت روز: ${stats.dayHigh} ریال")
-                                Text("تغییر روزانه: ${stats.dayChange}%")
-                                Text(
-                                    if (stats.isClosed) {
-                                        "وضعیت بازار: بسته"
-                                    } else {
-                                        "وضعیت بازار: باز"
-                                    }
-                                )
-                            }
-
-                            error.value?.let { message ->
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    text = "دریافت اطلاعات ناموفق بود:\n$message",
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Text(
-                                text = "در این مرحله فقط اطلاعات عمومی بازار خوانده می‌شود؛ سفارشی ثبت نمی‌شود.",
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
+                fun number(key: String): Double {
+                    val value = marketData.opt(key)
+                    return when (value) {
+                        is Number -> value.toDouble()
+                        is String -> value.toDoubleOrNull()
+                        else -> null
+                    } ?: throw IOException(
+                        "مقدار $key معتبر نیست"
+                    )
                 }
+
+                MarketStats(
+                    market = "BTC/IRT",
+                    latest = number("latest"),
+                    bestBuy = number("bestBuy"),
+                    bestSell = number("bestSell"),
+                    dayLow = number("dayLow"),
+                    dayHigh = number("dayHigh"),
+                    dayChange = number("dayChange"),
+                    isClosed = marketData.optBoolean(
+                        "isClosed",
+                        false
+                    )
+                )
+            } catch (e: Exception) {
+                if (e is IOException) throw e
+                throw IOException(
+                    "خطا در دریافت اطلاعات: " +
+                        (e.message ?: "نامشخص"),
+                    e
+                )
+            } finally {
+                connection?.disconnect()
             }
         }
-    }
 }
