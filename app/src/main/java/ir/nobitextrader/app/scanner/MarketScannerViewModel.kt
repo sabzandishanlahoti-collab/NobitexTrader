@@ -6,11 +6,11 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class MarketScannerUiState(
     val isScanning: Boolean = false,
@@ -18,7 +18,7 @@ data class MarketScannerUiState(
     val errorMessage: String? = null,
     val completedCount: Int = 0,
     val totalCount: Int = 0,
-    val sortMode: MarketSortMode = MarketSortMode.SPREAD_LOW_TO_HIGH
+    val sortMode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY
 )
 
 class MarketScannerViewModel : ViewModel() {
@@ -48,26 +48,24 @@ class MarketScannerViewModel : ViewModel() {
                     }
                 }
 
-                val currentMode = _uiState.value.sortMode
-                val sortedResults = MarketScanner.sortResults(
-                    results = results,
-                    mode = currentMode
+                val sorted = MarketScanner.sortResults(
+                    results,
+                    _uiState.value.sortMode
                 )
 
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
-                    results = sortedResults,
+                    results = sorted,
                     errorMessage = null,
                     completedCount = results.size,
                     totalCount = results.size
                 )
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
-                    errorMessage = exception.message
-                        ?: "اسکن بازار ناموفق بود."
+                    errorMessage = e.message ?: "اسکن بازار ناموفق بود."
                 )
             }
         }
@@ -77,10 +75,7 @@ class MarketScannerViewModel : ViewModel() {
         val current = _uiState.value
         _uiState.value = current.copy(
             sortMode = mode,
-            results = MarketScanner.sortResults(
-                results = current.results,
-                mode = mode
-            )
+            results = MarketScanner.sortResults(current.results, mode)
         )
     }
 
@@ -99,9 +94,7 @@ class MarketScannerViewModel : ViewModel() {
     fun cancelScan() {
         scanJob?.cancel()
         scanJob = null
-        _uiState.value = _uiState.value.copy(
-            isScanning = false
-        )
+        _uiState.value = _uiState.value.copy(isScanning = false)
     }
 
     override fun onCleared() {
