@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,7 +20,9 @@ data class MarketScannerUiState(
     val completedCount: Int = 0,
     val totalCount: Int = 0,
     val sortMode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY,
-    val filterMode: MarketResultFilterMode = MarketResultFilterMode.ALL
+    val filterMode: MarketResultFilterMode = MarketResultFilterMode.ALL,
+    val autoRefreshEnabled: Boolean = false,
+    val refreshIntervalMs: Long = MarketRefreshPolicy.DEFAULT_INTERVAL_MS
 )
 
 class MarketScannerViewModel : ViewModel() {
@@ -28,6 +31,7 @@ class MarketScannerViewModel : ViewModel() {
     val uiState: StateFlow<MarketScannerUiState> = _uiState.asStateFlow()
 
     private var scanJob: Job? = null
+    private var autoRefreshJob: Job? = null
 
     fun scanMarkets(symbols: List<String>? = null) {
         if (scanJob?.isActive == true) return
@@ -85,9 +89,55 @@ class MarketScannerViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(filterMode = mode)
     }
 
+    fun setRefreshInterval(intervalMs: Long) {
+        _uiState.value = _uiState.value.copy(
+            refreshIntervalMs = MarketRefreshPolicy.normalizeInterval(intervalMs)
+        )
+
+        if (_uiState.value.autoRefreshEnabled) {
+            startAutoRefresh()
+        }
+    }
+
+    fun toggleAutoRefresh() {
+        if (_uiState.value.autoRefreshEnabled) {
+            stopAutoRefresh()
+        } else {
+            _uiState.value = _uiState.value.copy(
+                autoRefreshEnabled = true
+            )
+            startAutoRefresh()
+            scanMarkets()
+        }
+    }
+
+    private fun startAutoRefresh() {
+        autoRefreshJob?.cancel()
+
+        autoRefreshJob = viewModelScope.launch {
+            while (_uiState.value.autoRefreshEnabled) {
+                delay(_uiState.value.refreshIntervalMs)
+
+                if (_uiState.value.autoRefreshEnabled) {
+                    scanMarkets()
+                }
+            }
+        }
+    }
+
+    private fun stopAutoRefresh() {
+        autoRefreshJob?.cancel()
+        autoRefreshJob = null
+
+        _uiState.value = _uiState.value.copy(
+            autoRefreshEnabled = false
+        )
+    }
+
     fun clearResults() {
         scanJob?.cancel()
         scanJob = null
+
         _uiState.value = _uiState.value.copy(
             isScanning = false,
             results = emptyList(),
@@ -100,10 +150,14 @@ class MarketScannerViewModel : ViewModel() {
     fun cancelScan() {
         scanJob?.cancel()
         scanJob = null
-        _uiState.value = _uiState.value.copy(isScanning = false)
+
+        _uiState.value = _uiState.value.copy(
+            isScanning = false
+        )
     }
 
     override fun onCleared() {
+        autoRefreshJob?.cancel()
         scanJob?.cancel()
         super.onCleared()
     }
