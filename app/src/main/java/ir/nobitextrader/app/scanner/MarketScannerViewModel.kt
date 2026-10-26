@@ -1,3 +1,4 @@
+
 package ir.nobitextrader.app.scanner
 
 import androidx.lifecycle.ViewModel
@@ -21,28 +22,39 @@ data class MarketScannerUiState(
 
 class MarketScannerViewModel : ViewModel() {
 
-    private val _uiState =
-        MutableStateFlow(MarketScannerUiState())
+    private val _uiState = MutableStateFlow(
+        MarketScannerUiState()
+    )
 
     val uiState: StateFlow<MarketScannerUiState> =
         _uiState.asStateFlow()
 
     private var scanJob: Job? = null
 
+    /**
+     * Null means scan every market returned by Nobitex.
+     * A supplied list scans only those requested markets.
+     */
     fun scanMarkets(
         symbols: List<String>? = null
     ) {
         if (_uiState.value.isScanning) return
 
-        scanJob?.cancel()
+        if (symbols != null && symbols.isEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "فهرست بازارها خالی است."
+            )
+            return
+        }
+
+        val requestedCount = symbols?.distinct()?.size ?: 0
+
+        _uiState.value = MarketScannerUiState(
+            isScanning = true,
+            totalCount = requestedCount
+        )
 
         scanJob = viewModelScope.launch {
-            _uiState.value = MarketScannerUiState(
-                isScanning = true,
-                results = emptyList(),
-                totalCount = symbols?.distinct()?.size ?: 0
-            )
-
             try {
                 val results = withContext(Dispatchers.IO) {
                     if (symbols == null) {
@@ -56,7 +68,7 @@ class MarketScannerViewModel : ViewModel() {
                     isScanning = false,
                     results = results,
                     errorMessage = if (results.isEmpty()) {
-                        "هیچ بازار معتبری از نوبیتکس دریافت نشد."
+                        "هیچ نتیجه‌ای از اسکن دریافت نشد."
                     } else {
                         null
                     },
@@ -69,8 +81,11 @@ class MarketScannerViewModel : ViewModel() {
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
                     errorMessage = e.message
-                        ?: "خطا در دریافت بازارهای نوبیتکس."
+                        ?: "خطا هنگام دریافت اطلاعات بازارها",
+                    completedCount = 0
                 )
+            } finally {
+                scanJob = null
             }
         }
     }
@@ -81,17 +96,20 @@ class MarketScannerViewModel : ViewModel() {
     }
 
     fun cancelScan() {
-        scanJob?.cancel()
-        scanJob = null
+        val job = scanJob ?: return
 
         _uiState.value = _uiState.value.copy(
             isScanning = false,
-            errorMessage = "اسکن متوقف شد."
+            errorMessage = "درخواست توقف اسکن ارسال شد."
         )
+
+        job.cancel()
+        scanJob = null
     }
 
     override fun onCleared() {
         scanJob?.cancel()
+        scanJob = null
         super.onCleared()
     }
 }
