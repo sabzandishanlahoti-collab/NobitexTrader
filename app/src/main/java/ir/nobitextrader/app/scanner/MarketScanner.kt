@@ -27,6 +27,8 @@ data class MarketScanResult(
 
 object MarketScanner {
 
+    private val symbolPattern = Regex("[A-Z0-9]{3,20}")
+
     val defaultMarkets = listOf(
         "BTCIRT", "ETHIRT", "LTCIRT", "XRPIRT", "TRXIRT",
         "DOGEIRT", "ADAIRT", "LINKIRT", "ETCIRT", "BNBIRT"
@@ -37,7 +39,7 @@ object MarketScanner {
     ): List<MarketScanResult> {
         val validSymbols = symbols
             .map { it.trim().uppercase(Locale.ROOT) }
-            .filter { it.matches(Regex("[A-Z0-9]{3,20}")) }
+            .filter { it.matches(symbolPattern) }
             .distinct()
 
         return validSymbols.map { symbol ->
@@ -61,12 +63,21 @@ object MarketScanner {
 
     suspend fun scanAll(): List<MarketScanResult> {
         val results = NobitexOrderBookApi.fetchAll()
-            .filter { it.symbol.matches(Regex("[A-Z0-9]{3,20}")) }
+            .filter { it.symbol.matches(symbolPattern) }
             .distinctBy { it.symbol }
-            .map { toScanResult(it) }
+            .map { snapshot ->
+                try {
+                    toScanResult(snapshot)
+                } catch (e: Exception) {
+                    failedResult(
+                        snapshot.symbol,
+                        e.message ?: "خطای پردازش دفتر سفارش"
+                    )
+                }
+            }
 
-        if (results.isEmpty()) {
-            throw IOException("اطلاعات معتبر بازار دریافت نشد.")
+        if (results.none { it.success }) {
+            throw IOException("هیچ دفتر سفارش معتبری دریافت نشد.")
         }
 
         return results
@@ -112,7 +123,7 @@ object MarketScanner {
             max: Double
         ): Double {
             if (max <= min) return 1.0
-            return (max - value) / (max - min)
+            return ((max - value) / (max - min)).coerceIn(0.0, 1.0)
         }
 
         fun normalizedHigherIsBetter(
@@ -138,9 +149,9 @@ object MarketScanner {
                 maxAsk
             )
 
-            (spreadScore * 0.50) +
-                (bidScore * 0.25) +
-                (askScore * 0.25)
+            spreadScore * 0.50 +
+                bidScore * 0.25 +
+                askScore * 0.25
         }
     }
 
@@ -150,45 +161,96 @@ object MarketScanner {
     fun failedCount(results: List<MarketScanResult>) =
         results.count { !it.success }
 
+    private fun failedResult(
+        symbol: String,
+        message: String
+    ) = MarketScanResult(
+        symbol = symbol,
+        lastPrice = 0.0,
+        bestBid = 0.0,
+        bestAsk = 0.0,
+        spreadPercent = 0.0,
+        bidLiquidityTop5 = 0.0,
+        askLiquidityTop5 = 0.0,
+        success = false,
+        error = message
+    )
+
     private fun toScanResult(
         snapshot: OrderBookSnapshot
     ): MarketScanResult {
         val bids = snapshot.bids
-            .filter { it.price.isFinite() && it.amount.isFinite() &&
-                it.price > 0.0 && it.amount >= 0.0 }
+            .filter {
+                it.price.isFinite() &&
+                    it.amount.isFinite() &&
+                    it.price > 0.0 &&
+                    it.amount > 0.0
+            }
             .sortedByDescending { it.price }
 
         val asks = snapshot.asks
-            .filter { it.price.isFinite() && it.amount.isFinite() &&
-                it.price > 0.0 && it.amount >= 0.0 }
+            .filter {
+                it.price.isFinite() &&
+                    it.amount.isFinite() &&
+                    it.price > 0.0 &&
+                    it.amount > 0.0
+            }
             .sortedBy { it.price }
 
         val bestBid = bids.firstOrNull()?.price ?: 0.0
         val bestAsk = asks.firstOrNull()?.price ?: 0.0
+        val lastPrice = snapshot.lastTradePrice
 
-        val validBook = bestBid > 0.0 &&
+        val validBook = bestBid.isFinite() &&
+            bestAsk.isFinite() &&
+            bestBid > 0.0 &&
             bestAsk > 0.0 &&
             bestAsk >= bestBid
 
-        val spreadPercent = if (validBook) {
+        if (!validBook) {
+            return failedResult(
+                snapshot.symbol,
+                "دفتر سفارش نامعتبر یا قیمت خرید و فروش ناسازگار است."
+            )
+        }
+
+        if (!lastPrice.isFinite() || lastPrice <= 0.0) {
+            return failedResult(
+                snapshot.symbol,
+                "قیمت آخرین معامله معتبر نیست."
+            )
+        }
+
+        val spreadPercent =
             ((bestAsk - bestBid) / bestBid) * 100.0
-        } else {
-            0.0
+
+        val bidLiquidity = bids.take(5).sumOf {
+            it.price * it.amount
+        }
+
+        val askLiquidity = asks.take(5).sumOf {
+            it.price * it.amount
+        }
+
+        if (!spreadPercent.isFinite() ||
+            !bidLiquidity.isFinite() ||
+            !askLiquidity.isFinite()
+        ) {
+            return failedResult(
+                snapshot.symbol,
+                "محاسبات دفتر سفارش مقدار غیرمعتبر تولید کرد."
+            )
         }
 
         return MarketScanResult(
             symbol = snapshot.symbol,
-            lastPrice = snapshot.lastTradePrice,
+            lastPrice = lastPrice,
             bestBid = bestBid,
             bestAsk = bestAsk,
             spreadPercent = spreadPercent.coerceAtLeast(0.0),
-            bidLiquidityTop5 = bids.take(5).sumOf {
-                it.price * it.amount
-            },
-            askLiquidityTop5 = asks.take(5).sumOf {
-                it.price * it.amount
-            },
-            success = validBook
+            bidLiquidityTop5 = bidLiquidity,
+            askLiquidityTop5 = askLiquidity,
+            success = true
         )
     }
 }
