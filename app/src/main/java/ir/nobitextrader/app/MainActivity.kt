@@ -2,8 +2,8 @@ package ir.nobitextrader.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -31,9 +32,12 @@ import ir.nobitextrader.app.data.MarketStats
 import ir.nobitextrader.app.data.NobitexMarketApi
 import ir.nobitextrader.app.scanner.MarketScannerScreen
 import ir.nobitextrader.app.scanner.MarketScannerViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 
 class MainActivity : ComponentActivity() {
+
+    private val scannerViewModel: MarketScannerViewModel by lazy {
+        ViewModelProvider(this)[MarketScannerViewModel::class.java]
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +45,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 val scope = rememberCoroutineScope()
+
                 val result = remember {
                     mutableStateOf<MarketStats?>(null)
                 }
@@ -53,11 +58,8 @@ class MainActivity : ComponentActivity() {
                 val showScanner = remember {
                     mutableStateOf(false)
                 }
-                val scannerViewModel: MarketScannerViewModel = viewModel()
 
-                BackHandler(
-                    enabled = showScanner.value
-                ) {
+                BackHandler(enabled = showScanner.value) {
                     showScanner.value = false
                 }
 
@@ -117,13 +119,11 @@ class MainActivity : ComponentActivity() {
                                             result.value = withContext(
                                                 Dispatchers.IO
                                             ) {
-                                                NobitexMarketApi
-                                                    .fetchMarketStats()
+                                                NobitexMarketApi.fetchMarketStats()
                                             }
                                         } catch (e: Exception) {
-                                            error.value =
-                                                e.message
-                                                    ?: "خطای نامشخص در دریافت اطلاعات"
+                                            error.value = e.message
+                                                ?: "خطای نامشخص در دریافت اطلاعات"
                                         } finally {
                                             loading.value = false
                                         }
@@ -131,10 +131,11 @@ class MainActivity : ComponentActivity() {
                                 }
                             ) {
                                 Text(
-                                    if (loading.value)
+                                    if (loading.value) {
                                         "در حال دریافت..."
-                                    else
+                                    } else {
                                         "دریافت قیمت واقعی BTC/IRT"
+                                    }
                                 )
                             }
 
@@ -157,13 +158,8 @@ class MainActivity : ComponentActivity() {
                             }
 
                             result.value?.let { stats ->
-                                Text(
-                                    text = "وضعیت دریافت: موفق",
-                                    fontSize = 18.sp
-                                )
-
+                                Text("وضعیت دریافت: موفق")
                                 Spacer(modifier = Modifier.height(12.dp))
-
                                 Text("بازار: ${stats.market}")
                                 Text("آخرین قیمت: ${stats.latest} ریال")
                                 Text("بهترین قیمت خرید: ${stats.bestBuy} ریال")
@@ -172,10 +168,11 @@ class MainActivity : ComponentActivity() {
                                 Text("بیشترین قیمت روز: ${stats.dayHigh} ریال")
                                 Text("تغییر روزانه: ${stats.dayChange}%")
                                 Text(
-                                    if (stats.isClosed)
+                                    if (stats.isClosed) {
                                         "وضعیت بازار: بسته"
-                                    else
+                                    } else {
                                         "وضعیت بازار: باز"
+                                    }
                                 )
                             }
 
