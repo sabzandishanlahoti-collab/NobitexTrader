@@ -73,16 +73,19 @@ object NobitexMarketApi {
 
                 fun number(key: String): Double {
                     val value = marketData.opt(key)
-                    return when (value) {
+                    val parsed = when (value) {
                         is Number -> value.toDouble()
                         is String -> value.toDoubleOrNull()
                         else -> null
-                    } ?: throw IOException(
-                        "مقدار $key معتبر نیست"
-                    )
+                    }
+
+                    return parsed?.takeIf { it.isFinite() }
+                        ?: throw IOException(
+                            "مقدار $key معتبر نیست"
+                        )
                 }
 
-                MarketStats(
+                val marketStats = MarketStats(
                     market = "BTC/IRT",
                     latest = number("latest"),
                     bestBuy = number("bestBuy"),
@@ -95,8 +98,21 @@ object NobitexMarketApi {
                         false
                     )
                 )
+
+                val validationErrors =
+                    MarketStatsValidator.validate(marketStats)
+
+                if (validationErrors.isNotEmpty()) {
+                    throw IOException(
+                        "دادهٔ بازار نامعتبر است: " +
+                            validationErrors.joinToString("; ")
+                    )
+                }
+
+                marketStats
             } catch (e: Exception) {
                 if (e is IOException) throw e
+
                 throw IOException(
                     "خطا در دریافت اطلاعات: " +
                         (e.message ?: "نامشخص"),
