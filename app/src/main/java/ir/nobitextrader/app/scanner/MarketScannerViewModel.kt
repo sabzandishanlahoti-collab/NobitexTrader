@@ -17,44 +17,28 @@ data class MarketScannerUiState(
     val results: List<MarketScanResult> = emptyList(),
     val errorMessage: String? = null,
     val completedCount: Int = 0,
-    val totalCount: Int = 0
+    val totalCount: Int = 0,
+    val sortMode: MarketSortMode = MarketSortMode.SPREAD_LOW_TO_HIGH
 )
 
 class MarketScannerViewModel : ViewModel() {
 
-    private val _uiState = MutableStateFlow(
-        MarketScannerUiState()
-    )
-
-    val uiState: StateFlow<MarketScannerUiState> =
-        _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(MarketScannerUiState())
+    val uiState: StateFlow<MarketScannerUiState> = _uiState.asStateFlow()
 
     private var scanJob: Job? = null
 
-    /**
-     * Null means scan every market returned by Nobitex.
-     * A supplied list scans only those requested markets.
-     */
-    fun scanMarkets(
-        symbols: List<String>? = null
-    ) {
-        if (_uiState.value.isScanning) return
-
-        if (symbols != null && symbols.isEmpty()) {
-            _uiState.value = _uiState.value.copy(
-                errorMessage = "فهرست بازارها خالی است."
-            )
-            return
-        }
-
-        val requestedCount = symbols?.distinct()?.size ?: 0
-
-        _uiState.value = MarketScannerUiState(
-            isScanning = true,
-            totalCount = requestedCount
-        )
+    fun scanMarkets(symbols: List<String>? = null) {
+        if (scanJob?.isActive == true) return
 
         scanJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isScanning = true,
+                errorMessage = null,
+                completedCount = 0,
+                totalCount = 0
+            )
+
             try {
                 val results = withContext(Dispatchers.IO) {
                     if (symbols == null) {
@@ -64,52 +48,64 @@ class MarketScannerViewModel : ViewModel() {
                     }
                 }
 
-                _uiState.value = MarketScannerUiState(
-                    isScanning = false,
+                val currentMode = _uiState.value.sortMode
+                val sortedResults = MarketScanner.sortResults(
                     results = results,
-                    errorMessage = if (results.isEmpty()) {
-                        "هیچ نتیجه‌ای از اسکن دریافت نشد."
-                    } else {
-                        null
-                    },
+                    mode = currentMode
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    isScanning = false,
+                    results = sortedResults,
+                    errorMessage = null,
                     completedCount = results.size,
                     totalCount = results.size
                 )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
-                    errorMessage = e.message
-                        ?: "خطا هنگام دریافت اطلاعات بازارها",
-                    completedCount = 0
+                    errorMessage = exception.message
+                        ?: "اسکن بازار ناموفق بود."
                 )
-            } finally {
-                scanJob = null
             }
         }
     }
 
+    fun setSortMode(mode: MarketSortMode) {
+        val current = _uiState.value
+        _uiState.value = current.copy(
+            sortMode = mode,
+            results = MarketScanner.sortResults(
+                results = current.results,
+                mode = mode
+            )
+        )
+    }
+
     fun clearResults() {
-        if (_uiState.value.isScanning) return
-        _uiState.value = MarketScannerUiState()
+        scanJob?.cancel()
+        scanJob = null
+        _uiState.value = _uiState.value.copy(
+            isScanning = false,
+            results = emptyList(),
+            errorMessage = null,
+            completedCount = 0,
+            totalCount = 0
+        )
     }
 
     fun cancelScan() {
-        val job = scanJob ?: return
-
-        _uiState.value = _uiState.value.copy(
-            isScanning = false,
-            errorMessage = "درخواست توقف اسکن ارسال شد."
-        )
-
-        job.cancel()
+        scanJob?.cancel()
         scanJob = null
+        _uiState.value = _uiState.value.copy(
+            isScanning = false
+        )
     }
 
     override fun onCleared() {
         scanJob?.cancel()
-        scanJob = null
         super.onCleared()
     }
 }
