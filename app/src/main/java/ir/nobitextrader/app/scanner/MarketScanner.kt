@@ -1,8 +1,6 @@
-
 package ir.nobitextrader.app.scanner
 
 import ir.nobitextrader.app.data.NobitexOrderBookApi
-import java.io.IOException
 
 data class MarketScanResult(
     val symbol: String,
@@ -18,10 +16,6 @@ data class MarketScanResult(
 
 object MarketScanner {
 
-    /**
-     * Retained for callers that explicitly request these markets.
-     * The default scan now discovers markets from Nobitex.
-     */
     val defaultMarkets: List<String> = listOf(
         "BTCIRT",
         "ETHIRT",
@@ -35,45 +29,6 @@ object MarketScanner {
         "BNBIRT"
     )
 
-    /**
-     * Fetches all public order books in one API request.
-     * Must be called on a background thread.
-     */
-    fun scanAll(): List<MarketScanResult> {
-        return try {
-            val books = NobitexOrderBookApi.fetchAll()
-
-            books.map { book ->
-                MarketScanResult(
-                    symbol = book.symbol,
-                    lastPrice = book.lastTradePrice,
-                    bestBid = book.bestBid,
-                    bestAsk = book.bestAsk,
-                    spreadPercent = book.spreadPercent,
-                    bidLiquidityTop5 = book.bids
-                        .take(5)
-                        .sumOf { it.amount },
-                    askLiquidityTop5 = book.asks
-                        .take(5)
-                        .sumOf { it.amount },
-                    success = true
-                )
-            }
-        } catch (e: Exception) {
-            if (e is InterruptedException) {
-                Thread.currentThread().interrupt()
-            }
-
-            throw IOException(
-                e.message ?: "Failed to fetch Nobitex markets",
-                e
-            )
-        }
-    }
-
-    /**
-     * Scans explicitly supplied symbols using individual requests.
-     */
     fun scan(
         symbols: List<String> = defaultMarkets
     ): List<MarketScanResult> {
@@ -89,7 +44,17 @@ object MarketScanner {
 
             if (!symbol.matches(Regex("[A-Z0-9]{3,20}"))) {
                 results.add(
-                    failure(symbol, "Invalid market symbol")
+                    MarketScanResult(
+                        symbol = symbol,
+                        lastPrice = 0.0,
+                        bestBid = null,
+                        bestAsk = null,
+                        spreadPercent = null,
+                        bidLiquidityTop5 = 0.0,
+                        askLiquidityTop5 = 0.0,
+                        success = false,
+                        error = "Invalid market symbol"
+                    )
                 )
                 continue
             }
@@ -117,9 +82,17 @@ object MarketScanner {
                 )
             } catch (e: Exception) {
                 results.add(
-                    failure(
-                        symbol,
-                        e.message ?: "Unknown market data error"
+                    MarketScanResult(
+                        symbol = symbol,
+                        lastPrice = 0.0,
+                        bestBid = null,
+                        bestAsk = null,
+                        spreadPercent = null,
+                        bidLiquidityTop5 = 0.0,
+                        askLiquidityTop5 = 0.0,
+                        success = false,
+                        error = e.message
+                            ?: "Unknown market data error"
                     )
                 )
             }
@@ -128,21 +101,6 @@ object MarketScanner {
         return results
     }
 
-    private fun failure(
-        symbol: String,
-        message: String
-    ) = MarketScanResult(
-        symbol = symbol,
-        lastPrice = 0.0,
-        bestBid = null,
-        bestAsk = null,
-        spreadPercent = null,
-        bidLiquidityTop5 = 0.0,
-        askLiquidityTop5 = 0.0,
-        success = false,
-        error = message
-    )
-
     fun rankBySpread(
         results: List<MarketScanResult>
     ): List<MarketScanResult> {
@@ -150,7 +108,6 @@ object MarketScanner {
             .filter {
                 it.success &&
                     it.spreadPercent != null &&
-                    it.spreadPercent.isFinite() &&
                     it.spreadPercent >= 0.0 &&
                     it.bestBid != null &&
                     it.bestAsk != null
@@ -160,9 +117,13 @@ object MarketScanner {
 
     fun successfulCount(
         results: List<MarketScanResult>
-    ): Int = results.count { it.success }
+    ): Int {
+        return results.count { it.success }
+    }
 
     fun failedCount(
         results: List<MarketScanResult>
-    ): Int = results.count { !it.success }
+    ): Int {
+        return results.count { !it.success }
+    }
 }
