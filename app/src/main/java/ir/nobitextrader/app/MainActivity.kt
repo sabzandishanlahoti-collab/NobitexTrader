@@ -1,9 +1,9 @@
-
 package ir.nobitextrader.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -29,8 +29,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ir.nobitextrader.app.data.MarketStats
 import ir.nobitextrader.app.data.NobitexMarketApi
+import ir.nobitextrader.app.scanner.MarketScannerScreen
+import ir.nobitextrader.app.scanner.MarketScannerViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -46,110 +50,150 @@ class MainActivity : ComponentActivity() {
                 val error = remember {
                     mutableStateOf<String?>(null)
                 }
+                val showScanner = remember {
+                    mutableStateOf(false)
+                }
+                val scannerViewModel: MarketScannerViewModel = viewModel()
+
+                BackHandler(
+                    enabled = showScanner.value
+                ) {
+                    showScanner.value = false
+                }
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "NobitexTrader",
-                            fontSize = 28.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = "ربات معاملات نوبیتکس",
-                            fontSize = 21.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        Button(
-                            enabled = !loading.value,
-                            onClick = {
-                                scope.launch {
-                                    loading.value = true
-                                    error.value = null
-
-                                    try {
-                                        result.value = withContext(
-                                            Dispatchers.IO
-                                        ) {
-                                            NobitexMarketApi
-                                                .fetchMarketStats()
-                                        }
-                                    } catch (e: Exception) {
-                                        error.value =
-                                            e.message
-                                                ?: "خطای نامشخص در دریافت اطلاعات"
-                                    } finally {
-                                        loading.value = false
-                                    }
-                                }
+                    if (showScanner.value) {
+                        Column(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Button(
+                                onClick = {
+                                    showScanner.value = false
+                                },
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                Text("بازگشت به صفحه اصلی")
                             }
+
+                            MarketScannerScreen(
+                                viewModel = scannerViewModel,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(24.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                if (loading.value)
-                                    "در حال دریافت..."
-                                else
-                                    "دریافت قیمت واقعی BTC/IRT"
+                                text = "NobitexTrader",
+                                fontSize = 28.sp
                             )
-                        }
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                        if (loading.value) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("در حال اتصال به نوبیتکس...")
-                        }
-
-                        result.value?.let { stats ->
                             Text(
-                                text = "وضعیت دریافت: موفق",
-                                fontSize = 18.sp
+                                text = "ربات معاملات نوبیتکس",
+                                fontSize = 21.sp
                             )
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            Button(
+                                enabled = !loading.value,
+                                onClick = {
+                                    scope.launch {
+                                        loading.value = true
+                                        error.value = null
+
+                                        try {
+                                            result.value = withContext(
+                                                Dispatchers.IO
+                                            ) {
+                                                NobitexMarketApi
+                                                    .fetchMarketStats()
+                                            }
+                                        } catch (e: Exception) {
+                                            error.value =
+                                                e.message
+                                                    ?: "خطای نامشخص در دریافت اطلاعات"
+                                        } finally {
+                                            loading.value = false
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    if (loading.value)
+                                        "در حال دریافت..."
+                                    else
+                                        "دریافت قیمت واقعی BTC/IRT"
+                                )
+                            }
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            Text("بازار: ${stats.market}")
-                            Text("آخرین قیمت: ${stats.latest} ریال")
-                            Text("بهترین قیمت خرید: ${stats.bestBuy} ریال")
-                            Text("بهترین قیمت فروش: ${stats.bestSell} ریال")
-                            Text("کمترین قیمت روز: ${stats.dayLow} ریال")
-                            Text("بیشترین قیمت روز: ${stats.dayHigh} ریال")
-                            Text("تغییر روزانه: ${stats.dayChange}%")
+                            Button(
+                                onClick = {
+                                    showScanner.value = true
+                                }
+                            ) {
+                                Text("ورود به اسکنر همه بازارها")
+                            }
+
+                            Spacer(modifier = Modifier.height(20.dp))
+
+                            if (loading.value) {
+                                CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text("در حال اتصال به نوبیتکس...")
+                            }
+
+                            result.value?.let { stats ->
+                                Text(
+                                    text = "وضعیت دریافت: موفق",
+                                    fontSize = 18.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Text("بازار: ${stats.market}")
+                                Text("آخرین قیمت: ${stats.latest} ریال")
+                                Text("بهترین قیمت خرید: ${stats.bestBuy} ریال")
+                                Text("بهترین قیمت فروش: ${stats.bestSell} ریال")
+                                Text("کمترین قیمت روز: ${stats.dayLow} ریال")
+                                Text("بیشترین قیمت روز: ${stats.dayHigh} ریال")
+                                Text("تغییر روزانه: ${stats.dayChange}%")
+                                Text(
+                                    if (stats.isClosed)
+                                        "وضعیت بازار: بسته"
+                                    else
+                                        "وضعیت بازار: باز"
+                                )
+                            }
+
+                            error.value?.let { message ->
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "دریافت اطلاعات ناموفق بود:\n$message",
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
                             Text(
-                                if (stats.isClosed)
-                                    "وضعیت بازار: بسته"
-                                else
-                                    "وضعیت بازار: باز"
+                                text = "در این مرحله فقط اطلاعات عمومی بازار خوانده می‌شود؛ سفارشی ثبت نمی‌شود.",
+                                fontSize = 14.sp
                             )
                         }
-
-                        error.value?.let { message ->
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "دریافت اطلاعات ناموفق بود:\n$message",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Text(
-                            text = "در این مرحله فقط اطلاعات عمومی بازار خوانده می‌شود؛ سفارشی ثبت نمی‌شود.",
-                            fontSize = 14.sp
-                        )
                     }
                 }
             }
