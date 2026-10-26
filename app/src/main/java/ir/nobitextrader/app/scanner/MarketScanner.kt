@@ -1,6 +1,8 @@
+
 package ir.nobitextrader.app.scanner
 
 import ir.nobitextrader.app.data.NobitexOrderBookApi
+import ir.nobitextrader.app.data.OrderBookSnapshot
 import kotlinx.coroutines.CancellationException
 
 data class MarketScanResult(
@@ -17,6 +19,8 @@ data class MarketScanResult(
 
 object MarketScanner {
 
+    // Used only when a specific list of symbols is requested.
+    // scanAll() obtains the actual markets from Nobitex.
     val defaultMarkets: List<String> = listOf(
         "BTCIRT",
         "ETHIRT",
@@ -53,8 +57,9 @@ object MarketScanner {
             if (!seen.add(symbol)) continue
 
             try {
-                val book = NobitexOrderBookApi.fetch(symbol)
-                results.add(book.toScanResult())
+                results.add(
+                    NobitexOrderBookApi.fetch(symbol).toScanResult()
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -70,40 +75,69 @@ object MarketScanner {
         return results
     }
 
+    /**
+     * Retrieves the market list from Nobitex's public all-order-books
+     * endpoint. It does not treat the defaultMarkets list as all markets.
+     */
     fun scanAll(): List<MarketScanResult> {
-        return try {
+        val snapshots = try {
             NobitexOrderBookApi.fetchAll()
-                .distinctBy { it.symbol }
-                .map { it.toScanResult() }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             throw IllegalStateException(
-                e.message ?: "Failed to fetch all Nobitex order books",
+                e.message ?: "Failed to fetch Nobitex order books",
                 e
             )
         }
+
+        val uniqueSnapshots = snapshots
+            .filter {
+                it.symbol.matches(Regex("[A-Z0-9]{3,20}"))
+            }
+            .distinctBy { it.symbol }
+
+        if (uniqueSnapshots.isEmpty()) {
+            throw IllegalStateException(
+                "Nobitex returned no valid market order books"
+            )
+        }
+
+        return uniqueSnapshots.map { snapshot ->
+            snapshot.toScanResult()
+        }
     }
 
-    private fun ir.nobitextrader.app.data.OrderBookSnapshot
-        .toScanResult(): MarketScanResult {
+    private fun OrderBookSnapshot.toScanResult(): MarketScanResult {
+        val bid = bestBid
+        val ask = bestAsk
+
+        val validBook =
+            bids.isNotEmpty() &&
+            asks.isNotEmpty() &&
+            bid != null &&
+            ask != null &&
+            bid > 0.0 &&
+            ask > 0.0 &&
+            ask >= bid
+
         return MarketScanResult(
             symbol = symbol,
             lastPrice = lastTradePrice,
-            bestBid = bestBid,
-            bestAsk = bestAsk,
-            spreadPercent = spreadPercent,
+            bestBid = bid,
+            bestAsk = ask,
+            spreadPercent = if (validBook) spreadPercent else null,
             bidLiquidityTop5 = bids
                 .take(5)
                 .sumOf { it.amount },
             askLiquidityTop5 = asks
                 .take(5)
                 .sumOf { it.amount },
-            success = bids.isNotEmpty() && asks.isNotEmpty(),
-            error = if (bids.isEmpty() || asks.isEmpty()) {
-                "Order book has no valid bid or ask levels"
-            } else {
+            success = validBook,
+            error = if (validBook) {
                 null
+            } else {
+                "Order book has missing or invalid bid/ask levels"
             }
         )
     }
@@ -139,13 +173,9 @@ object MarketScanner {
 
     fun successfulCount(
         results: List<MarketScanResult>
-    ): Int {
-        return results.count { it.success }
-    }
+    ): Int = results.count { it.success }
 
     fun failedCount(
         results: List<MarketScanResult>
-    ): Int {
-        return results.count { !it.success }
-    }
+    ): Int = results.count { !it.success }
 }
