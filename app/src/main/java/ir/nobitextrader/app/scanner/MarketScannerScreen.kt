@@ -5,10 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -34,96 +33,136 @@ fun MarketScannerScreen(
 
     Column(
         modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .fillMaxWidth()
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "اسکن بازارهای نوبیتکس",
-            style = MaterialTheme.typography.headlineSmall
+            text = "اسکن بازار نوبیتکس",
+            style = MaterialTheme.typography.titleLarge
         )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "نتایج از داده‌های دریافتی API نمایش داده می‌شوند؛ " +
-                "بازارهای ناموفق جداگانه مشخص می‌شوند.",
-            style = MaterialTheme.typography.bodySmall
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                modifier = Modifier.weight(1f),
+                onClick = { viewModel.scanMarkets() },
                 enabled = !state.isScanning,
-                onClick = {
-                    viewModel.scanMarkets()
-                }
+                modifier = Modifier.weight(1f)
             ) {
-                Text(
-                    if (state.isScanning) {
-                        "در حال اسکن..."
-                    } else {
-                        "اسکن همه بازارها"
-                    }
-                )
+                Text(if (state.isScanning) "در حال اسکن..." else "اسکن همه بازارها")
             }
 
             OutlinedButton(
-                enabled = !state.isScanning &&
-                    state.results.isNotEmpty(),
-                onClick = {
-                    viewModel.clearResults()
-                }
+                onClick = { viewModel.clearResults() },
+                enabled = !state.isScanning && state.results.isNotEmpty()
             ) {
                 Text("پاک‌کردن")
             }
         }
 
-        if (state.isScanning) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                CircularProgressIndicator()
-                Text("در حال دریافت دفتر سفارش بازارها...")
-            }
-        }
+        Text(
+            text = "مرتب‌سازی نتایج:",
+            style = MaterialTheme.typography.titleMedium
+        )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            SortButton(
+                text = "اختلاف کمتر",
+                selected = state.sortMode == MarketSortMode.SPREAD_LOW_TO_HIGH,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    viewModel.setSortMode(MarketSortMode.SPREAD_LOW_TO_HIGH)
+                }
+            )
 
-        val successful = state.results.count { it.success }
-        val failed = state.results.count { !it.success }
+            SortButton(
+                text = "تقاضای بیشتر",
+                selected = state.sortMode == MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    viewModel.setSortMode(
+                        MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW
+                    )
+                }
+            )
 
-        Text("تعداد نتایج: ${state.results.size}")
-        Text("موفق: $successful   ناموفق: $failed")
-
-        state.errorMessage?.let { message ->
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium
+            SortButton(
+                text = "عرضه بیشتر",
+                selected = state.sortMode == MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW,
+                modifier = Modifier.weight(1f),
+                onClick = {
+                    viewModel.setSortMode(
+                        MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW
+                    )
+                }
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "کل: ${state.totalCount} | موفق: ${
+                MarketScanner.successfulCount(state.results)
+            } | ناموفق: ${MarketScanner.failedCount(state.results)}"
+        )
+
+        state.errorMessage?.let { message ->
+            Text(
+                text = "خطا: $message",
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
+        if (state.isScanning) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator()
+                Text("در حال دریافت داده‌های واقعی بازار...")
+                Spacer(modifier = Modifier.weight(1f))
+                OutlinedButton(onClick = { viewModel.cancelScan() }) {
+                    Text("توقف")
+                }
+            }
+        }
 
         LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.weight(1f, fill = true),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(
                 items = state.results,
-                key = { it.symbol }
+                key = { "${it.symbol}_${it.success}" }
             ) { result ->
-                MarketResultCard(result)
+                MarketResultCard(result = result)
             }
+        }
+    }
+}
+
+@Composable
+private fun SortButton(
+    text: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    if (selected) {
+        Button(
+            onClick = onClick,
+            modifier = modifier
+        ) {
+            Text(text)
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier
+        ) {
+            Text(text)
         }
     }
 }
@@ -145,68 +184,37 @@ private fun MarketResultCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = result.symbol,
                 style = MaterialTheme.typography.titleMedium
             )
 
-            Text(
-                text = if (result.success) {
-                    "وضعیت: دریافت موفق دفتر سفارش"
-                } else {
-                    "وضعیت: ناموفق"
-                },
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            if (result.success) {
+            if (!result.success) {
                 Text(
-                    text = "آخرین قیمت: ${
-                        formatNumber(result.lastPrice)
-                    }"
+                    text = result.error ?: "داده معتبر نیست",
+                    color = MaterialTheme.colorScheme.error
                 )
-
+            } else {
+                Text("آخرین قیمت: ${formatNumber(result.lastPrice)}")
+                Text("بهترین خرید: ${formatNumber(result.bestBid)}")
+                Text("بهترین فروش: ${formatNumber(result.bestAsk)}")
                 Text(
-                    text = "بهترین خرید: ${
-                        result.bestBid?.let(::formatNumber) ?: "ناموجود"
-                    }"
+                    "اختلاف قیمت: ${
+                        String.format(Locale.US, "%.4f", result.spreadPercent)
+                    }٪"
                 )
-
                 Text(
-                    text = "بهترین فروش: ${
-                        result.bestAsk?.let(::formatNumber) ?: "ناموجود"
-                    }"
-                )
-
-                Text(
-                    text = "اختلاف قیمت: ${
-                        result.spreadPercent?.let {
-                            String.format(Locale.US, "%.4f%%", it)
-                        } ?: "ناموجود"
-                    }"
-                )
-
-                Text(
-                    text = "حجم خرید ۵ سطح اول: ${
+                    "نقدینگی ۵ سفارش خرید: ${
                         formatNumber(result.bidLiquidityTop5)
                     }"
                 )
-
                 Text(
-                    text = "حجم فروش ۵ سطح اول: ${
+                    "نقدینگی ۵ سفارش فروش: ${
                         formatNumber(result.askLiquidityTop5)
                     }"
-                )
-            }
-
-            result.error?.let { message ->
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "علت: $message",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }
@@ -214,7 +222,10 @@ private fun MarketResultCard(
 }
 
 private fun formatNumber(value: Double): String {
+    if (!value.isFinite()) return "—"
+
     return String.format(Locale.US, "%,.8f", value)
         .trimEnd('0')
         .trimEnd('.')
+        .ifEmpty { "0" }
 }
