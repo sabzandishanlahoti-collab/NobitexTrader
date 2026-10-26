@@ -18,7 +18,8 @@ data class MarketScannerUiState(
     val errorMessage: String? = null,
     val completedCount: Int = 0,
     val totalCount: Int = 0,
-    val sortMode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY
+    val sortMode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY,
+    val filterMode: MarketResultFilterMode = MarketResultFilterMode.ALL
 )
 
 class MarketScannerViewModel : ViewModel() {
@@ -48,12 +49,13 @@ class MarketScannerViewModel : ViewModel() {
                     }
                 }
 
+                val current = _uiState.value
                 val sorted = MarketScanner.sortResults(
                     results,
-                    _uiState.value.sortMode
+                    current.sortMode
                 )
 
-                _uiState.value = _uiState.value.copy(
+                _uiState.value = current.copy(
                     isScanning = false,
                     results = sorted,
                     errorMessage = null,
@@ -77,6 +79,10 @@ class MarketScannerViewModel : ViewModel() {
             sortMode = mode,
             results = MarketScanner.sortResults(current.results, mode)
         )
+    }
+
+    fun setFilterMode(mode: MarketResultFilterMode) {
+        _uiState.value = _uiState.value.copy(filterMode = mode)
     }
 
     fun clearResults() {
