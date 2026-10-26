@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -29,6 +30,11 @@ fun MarketScannerScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+
+    val visibleResults = MarketResultFilter.apply(
+        results = state.results,
+        mode = state.filterMode
+    )
 
     Column(
         modifier = modifier
@@ -61,65 +67,95 @@ fun MarketScannerScreen(
             }
         }
 
-        Text(
-            text = "مرتب‌سازی نتایج:",
-            style = MaterialTheme.typography.titleMedium
-        )
+        Text("مرتب‌سازی نتایج:", style = MaterialTheme.typography.titleMedium)
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            SortButton(
+                text = "ترکیبی",
+                selected = state.sortMode == MarketSortMode.BALANCED_PRIORITY,
+                modifier = Modifier.weight(1f)
             ) {
-                SortButton(
-                    text = "ترکیبی",
-                    selected = state.sortMode == MarketSortMode.BALANCED_PRIORITY,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    viewModel.setSortMode(MarketSortMode.BALANCED_PRIORITY)
-                }
-
-                SortButton(
-                    text = "اختلاف کمتر",
-                    selected = state.sortMode == MarketSortMode.SPREAD_LOW_TO_HIGH,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    viewModel.setSortMode(MarketSortMode.SPREAD_LOW_TO_HIGH)
-                }
+                viewModel.setSortMode(MarketSortMode.BALANCED_PRIORITY)
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            SortButton(
+                text = "اختلاف کمتر",
+                selected = state.sortMode == MarketSortMode.SPREAD_LOW_TO_HIGH,
+                modifier = Modifier.weight(1f)
             ) {
-                SortButton(
-                    text = "تقاضای بیشتر",
-                    selected = state.sortMode ==
-                        MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    viewModel.setSortMode(
-                        MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW
-                    )
-                }
-
-                SortButton(
-                    text = "عرضه بیشتر",
-                    selected = state.sortMode ==
-                        MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    viewModel.setSortMode(
-                        MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW
-                    )
-                }
+                viewModel.setSortMode(MarketSortMode.SPREAD_LOW_TO_HIGH)
             }
         }
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            SortButton(
+                text = "تقاضای بیشتر",
+                selected = state.sortMode ==
+                    MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW,
+                modifier = Modifier.weight(1f)
+            ) {
+                viewModel.setSortMode(
+                    MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW
+                )
+            }
+
+            SortButton(
+                text = "عرضه بیشتر",
+                selected = state.sortMode ==
+                    MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW,
+                modifier = Modifier.weight(1f)
+            ) {
+                viewModel.setSortMode(
+                    MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW
+                )
+            }
+        }
+
+        Text("فیلتر بازار:", style = MaterialTheme.typography.titleMedium)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            SortButton(
+                text = "همه",
+                selected = state.filterMode == MarketResultFilterMode.ALL,
+                modifier = Modifier.weight(1f)
+            ) {
+                viewModel.setFilterMode(MarketResultFilterMode.ALL)
+            }
+
+            SortButton(
+                text = "اختلاف حداکثر ۱٪",
+                selected = state.filterMode ==
+                    MarketResultFilterMode.SPREAD_UNDER_ONE_PERCENT,
+                modifier = Modifier.weight(1f)
+            ) {
+                viewModel.setFilterMode(
+                    MarketResultFilterMode.SPREAD_UNDER_ONE_PERCENT
+                )
+            }
+        }
+
+        SortButton(
+            text = "فقط بازارهای دارای نقدینگی",
+            selected = state.filterMode ==
+                MarketResultFilterMode.POSITIVE_LIQUIDITY,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            viewModel.setFilterMode(
+                MarketResultFilterMode.POSITIVE_LIQUIDITY
+            )
+        }
+
         Text(
-            text = "کل: ${state.totalCount} | موفق: ${
-                MarketScanner.successfulCount(state.results)
-            } | ناموفق: ${MarketScanner.failedCount(state.results)}"
+            text = "نتایج نمایش‌داده‌شده: ${visibleResults.size} از ${state.totalCount}"
         )
 
         state.errorMessage?.let { message ->
@@ -145,7 +181,7 @@ fun MarketScannerScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(
-                items = state.results,
+                items = visibleResults,
                 key = { "${it.symbol}_${it.success}" }
             ) { result ->
                 MarketResultCard(result)
