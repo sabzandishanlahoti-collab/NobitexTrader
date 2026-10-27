@@ -22,7 +22,7 @@ data class MarketStats(
 object NobitexMarketApi {
 
     private const val STATS_URL =
-        "https://apiv2.nobitex.ir/market/stats"
+        "https://apiv2.nobitex.ir/market/stats?srcCurrency=btc&dstCurrency=rls"
 
     suspend fun fetchMarketStats(): MarketStats =
         withContext(Dispatchers.IO) {
@@ -34,10 +34,7 @@ object NobitexMarketApi {
                     requestMethod = "GET"
                     connectTimeout = 10_000
                     readTimeout = 10_000
-                    setRequestProperty(
-                        "Accept",
-                        "application/json"
-                    )
+                    setRequestProperty("Accept", "application/json")
                 }
 
                 val statusCode = connection.responseCode
@@ -55,9 +52,13 @@ object NobitexMarketApi {
                 val root = try {
                     JSONObject(response)
                 } catch (e: Exception) {
+                    throw IOException("Nobitex returned invalid JSON", e)
+                }
+
+                val apiStatus = root.optString("status")
+                if (apiStatus != "ok") {
                     throw IOException(
-                        "Nobitex returned invalid JSON",
-                        e
+                        "Nobitex API status was not ok: $apiStatus"
                     )
                 }
 
@@ -67,34 +68,23 @@ object NobitexMarketApi {
                     )
 
                 val marketObject =
-                    statsObject.optJSONObject("btc-irt")
+                    statsObject.optJSONObject("btc-rls")
+                        ?: statsObject.optJSONObject("btc-irt")
                         ?: throw IOException(
-                            "BTC-IRT market data is missing"
+                            "BTC market data is missing. Available markets: " +
+                                statsObject.keys().asSequence().toList()
+                                    .joinToString()
                         )
 
                 val marketStats = MarketStats(
                     market = "BTCIRT",
-                    latest = marketStatsNumber(
-                        marketObject, "latest"
-                    ),
-                    bestBuy = marketStatsNumber(
-                        marketObject, "bestBuy"
-                    ),
-                    bestSell = marketStatsNumber(
-                        marketObject, "bestSell"
-                    ),
-                    dayLow = marketStatsNumber(
-                        marketObject, "dayLow"
-                    ),
-                    dayHigh = marketStatsNumber(
-                        marketObject, "dayHigh"
-                    ),
-                    dayChange = marketStatsNumber(
-                        marketObject, "dayChange"
-                    ),
-                    isClosed = marketStatsBoolean(
-                        marketObject, "isClosed"
-                    )
+                    latest = marketStatsNumber(marketObject, "latest"),
+                    bestBuy = marketStatsNumber(marketObject, "bestBuy"),
+                    bestSell = marketStatsNumber(marketObject, "bestSell"),
+                    dayLow = marketStatsNumber(marketObject, "dayLow"),
+                    dayHigh = marketStatsNumber(marketObject, "dayHigh"),
+                    dayChange = marketStatsNumber(marketObject, "dayChange"),
+                    isClosed = marketStatsBoolean(marketObject, "isClosed")
                 )
 
                 val validationErrors =
@@ -102,7 +92,7 @@ object NobitexMarketApi {
 
                 if (validationErrors.isNotEmpty()) {
                     throw IOException(
-                        "Invalid BTC-IRT market data: " +
+                        "Invalid BTC market data: " +
                             validationErrors.joinToString("; ")
                     )
                 }
@@ -125,9 +115,7 @@ object NobitexMarketApi {
         key: String
     ): Double {
         if (!json.has(key) || json.isNull(key)) {
-            throw IOException(
-                "Nobitex response is missing '$key'"
-            )
+            throw IOException("Nobitex response is missing '$key'")
         }
 
         val value = when (val raw = json.get(key)) {
@@ -142,9 +130,7 @@ object NobitexMarketApi {
         }
 
         if (!value.isFinite()) {
-            throw IOException(
-                "Nobitex field '$key' is not finite"
-            )
+            throw IOException("Nobitex field '$key' is not finite")
         }
 
         return value
@@ -155,9 +141,7 @@ object NobitexMarketApi {
         key: String
     ): Boolean {
         if (!json.has(key) || json.isNull(key)) {
-            throw IOException(
-                "Nobitex response is missing '$key'"
-            )
+            throw IOException("Nobitex response is missing '$key'")
         }
 
         return when (val raw = json.get(key)) {
