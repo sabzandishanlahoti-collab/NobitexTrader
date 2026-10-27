@@ -1,3 +1,4 @@
+
 package ir.nobitextrader.app.risk
 
 import java.io.File
@@ -10,10 +11,8 @@ import kotlin.concurrent.withLock
 /**
  * File-backed persistent risk event history.
  *
- * Stores serialized events in chronological order.
- * Writes use a temporary file before replacing the main file.
- *
- * This class does not execute orders or replace RiskLock.
+ * Records are stored chronologically and bounded by maxEvents.
+ * A failed replacement attempts to restore the previous history.
  */
 class PersistentRiskEventStore(
     private val file: File,
@@ -27,55 +26,17 @@ class PersistentRiskEventStore(
         }
     }
 
-    /**
-     * Loads events from disk.
-     *
-     * Invalid records cause an exception instead of being silently
-     * discarded, so history corruption is not hidden.
-     */
     fun load(): List<RiskEvent> = lock.withLock {
-        if (!file.exists()) {
-            return emptyList()
-        }
-
-        if (!file.isFile) {
-            throw IOException("Risk event path is not a file")
-        }
-
-        val records = file.readLines(StandardCharsets.UTF_8)
-            .filter { it.isNotEmpty() }
-
-        records.mapIndexed { index, record ->
-            try {
-                RiskEventSerializer.deserialize(record)
-            } catch (exception: Exception) {
-                throw IOException(
-                    "Invalid risk event record at line ${index + 1}",
-                    exception
-                )
-            }
-        }.takeLast(maxEvents)
+        loadUnlocked()
     }
 
-    /**
-     * Appends an event and persists the bounded history.
-     *
-     * The in-memory result is not reported as saved unless the disk
-     * replacement succeeds.
-     */
     fun append(event: RiskEvent) = lock.withLock {
-        val current = loadUnlocked()
-        val updated = (current + event).takeLast(maxEvents)
-        writeAtomically(updated)
+        val updated = (loadUnlocked() + event).takeLast(maxEvents)
+        writeSafely(updated)
     }
 
-    /**
-     * Returns newest events first, matching RiskEventStore.latest().
-     */
     fun latest(limit: Int = 100): List<RiskEvent> {
-        require(limit >= 0) {
-            "limit cannot be negative"
-        }
+        require(limit >= 0) { "limit cannot be negative" }
 
         return lock.withLock {
             loadUnlocked().takeLast(limit).asReversed()
@@ -86,10 +47,6 @@ class PersistentRiskEventStore(
         loadUnlocked().size
     }
 
-    /**
-     * Deletes persisted history.
-     * Call only for an intentional user-requested history reset.
-     */
     fun clear() = lock.withLock {
         if (file.exists() && !file.delete()) {
             throw IOException("Could not delete risk event history")
@@ -103,22 +60,28 @@ class PersistentRiskEventStore(
             throw IOException("Risk event path is not a file")
         }
 
-        return file.readLines(StandardCharsets.UTF_8)
-            .filter { it.isNotEmpty() }
-            .mapIndexed { index, record ->
-                try {
-                    RiskEventSerializer.deserialize(record)
-                } catch (exception: Exception) {
-                    throw IOException(
-                        "Invalid risk event record at line ${index + 1}",
-                        exception
-                    )
+        return try {
+            file.readLines(StandardCharsets.UTF_8)
+                .filter { it.isNotEmpty() }
+                .mapIndexed { index, record ->
+                    try {
+                        RiskEventSerializer.deserialize(record)
+                    } catch (exception: Exception) {
+                        throw IOException(
+                            "Invalid risk event record at line ${index + 1}",
+                            exception
+                        )
+                    }
                 }
-            }
-            .takeLast(maxEvents)
+                .takeLast(maxEvents)
+        } catch (exception: IOException) {
+            throw exception
+        } catch (exception: Exception) {
+            throw IOException("Could not read risk event history", exception)
+        }
     }
 
-    private fun writeAtomically(events: List<RiskEvent>) {
+    private fun writeSafely(events: List<RiskEvent>) {
         val parent = file.absoluteFile.parentFile
             ?: throw IOException("Invalid risk event history path")
 
@@ -126,35 +89,62 @@ class PersistentRiskEventStore(
             throw IOException("Could not create risk event directory")
         }
 
-        val tempFile = File(parent, "${file.name}.tmp")
+        val temp = File(parent, "${file.name}.tmp")
+        val backup = File(parent, "${file.name}.bak")
+
+        if (temp == file || backup == file) {
+            throw IOException("Invalid risk event history filename")
+        }
 
         try {
-            FileOutputStream(tempFile).use { output ->
+            FileOutputStream(temp).use { output ->
                 events.forEach { event ->
                     val record = RiskEventSerializer.serialize(event)
                     output.write(record.toByteArray(StandardCharsets.UTF_8))
                     output.write('\n'.code)
                 }
-
                 output.flush()
                 output.fd.sync()
             }
 
+            var backedUp = false
+
             if (file.exists()) {
-                if (!file.delete()) {
+                if (backup.exists() && !backup.delete()) {
+                    throw IOException("Could not clear old backup file")
+                }
+
+                if (!file.renameTo(backup)) {
+                    throw IOException("Could not preserve existing history")
+                }
+                backedUp = true
+            }
+
+            if (!temp.renameTo(file)) {
+                if (backedUp && !backup.renameTo(file)) {
                     throw IOException(
-                        "Could not replace existing risk event history"
+                        "Replacement failed and previous history could not be restored; backup remains at ${backup.absolutePath}"
+                    )
+                }
+                throw IOException("Could not install new risk event history")
+            }
+
+            if (backup.exists() && !backup.delete()) {
+                // The new history is already installed. Retain the backup
+                // rather than treating a backup-cleanup failure as data loss.
+            }
+        } catch (exception: Exception) {
+            if (temp.exists()) temp.delete()
+
+            if (!file.exists() && backup.exists()) {
+                if (!backup.renameTo(file)) {
+                    throw IOException(
+                        "History update failed; previous history remains at ${backup.absolutePath}",
+                        exception
                     )
                 }
             }
 
-            if (!tempFile.renameTo(file)) {
-                throw IOException(
-                    "Could not move temporary risk history into place"
-                )
-            }
-        } catch (exception: Exception) {
-            tempFile.delete()
             throw exception
         }
     }
