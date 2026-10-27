@@ -1,3 +1,4 @@
+
 package ir.nobitextrader.app.data
 
 import ir.nobitextrader.app.scanner.MarketRefreshPolicy
@@ -6,6 +7,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 
 data class OrderBookLevel(
     val price: Double,
@@ -38,7 +40,6 @@ data class OrderBookSnapshot(
         get() {
             val bid = bestBid ?: return null
             val ask = bestAsk ?: return null
-
             if (!bid.isFinite() || !ask.isFinite()) return null
             if (bid <= 0.0 || ask < bid) return null
 
@@ -71,38 +72,58 @@ object NobitexOrderBookApi {
         return parseSnapshot(normalizedSymbol, root)
     }
 
+    /**
+     * Downloads the exchange's all-order-books response and parses at most
+     * [maxMarkets] valid market entries. The endpoint response itself may
+     * contain more markets; this limit controls parsing and returned results,
+     * not the number of markets sent by the server.
+     */
     @Throws(IOException::class)
     fun fetchAll(
         timeoutMillis: Long =
             MarketRefreshPolicy.DEFAULT.requestTimeoutMillis,
+        maxMarkets: Int = MarketRefreshPolicy.DEFAULT.maxMarketsPerBatch,
         onProgress: ((completed: Int, total: Int) -> Unit)? = null
     ): List<OrderBookSnapshot> {
+        require(maxMarkets in 1..50) {
+            "maxMarkets must be between 1 and 50"
+        }
+
         val root = getJson(
             url = "${BASE_URL}all",
             timeoutMillis = timeoutMillis
         )
 
-        val validEntries = mutableListOf<Pair<String, JSONObject>>()
+        val entries = mutableListOf<Pair<String, JSONObject>>()
         val keys = root.keys()
 
         while (keys.hasNext()) {
             val symbol = keys.next()
-            if (!symbolPattern.matches(symbol)) continue
+                .uppercase(Locale.ROOT)
 
-            val market = root.optJSONObject(symbol) ?: continue
-            validEntries.add(symbol to market)
+            if (!symbol.matches(symbolPattern)) continue
+
+            val market = root.optJSONObject(symbol)
+                ?: root.optJSONObject(symbol.lowercase(Locale.ROOT))
+                ?: continue
+
+            entries.add(symbol to market)
         }
 
-        val total = validEntries.size
+        val selectedEntries = entries
+            .distinctBy { it.first }
+            .take(maxMarkets)
+
+        val total = selectedEntries.size
         val markets = mutableListOf<OrderBookSnapshot>()
 
         onProgress?.invoke(0, total)
 
-        validEntries.forEachIndexed { index, (symbol, market) ->
+        selectedEntries.forEachIndexed { index, (symbol, market) ->
             try {
                 markets.add(parseSnapshot(symbol, market))
             } catch (_: IOException) {
-                // Ignore malformed market entries.
+                // Skip malformed market data without fabricating results.
             } finally {
                 onProgress?.invoke(index + 1, total)
             }
@@ -110,7 +131,7 @@ object NobitexOrderBookApi {
 
         if (markets.isEmpty()) {
             throw IOException(
-                "Nobitex returned no valid market order books"
+                "Nobitex returned no valid order books within the selected batch"
             )
         }
 
@@ -127,18 +148,14 @@ object NobitexOrderBookApi {
             )
         }
 
-        val timeout = timeoutMillis.toInt()
         val connection =
             URL(url).openConnection() as HttpURLConnection
 
         try {
             connection.requestMethod = "GET"
-            connection.connectTimeout = timeout
-            connection.readTimeout = timeout
-            connection.setRequestProperty(
-                "Accept",
-                "application/json"
-            )
+            connection.connectTimeout = timeoutMillis.toInt()
+            connection.readTimeout = timeoutMillis.toInt()
+            connection.setRequestProperty("Accept", "application/json")
 
             val statusCode = connection.responseCode
 
@@ -179,7 +196,7 @@ object NobitexOrderBookApi {
     }
 
     private fun normalizeSymbol(symbol: String): String {
-        val normalized = symbol.trim().uppercase()
+        val normalized = symbol.trim().uppercase(Locale.ROOT)
 
         if (!symbolPattern.matches(normalized)) {
             throw IllegalArgumentException("Invalid market symbol")
@@ -213,7 +230,6 @@ object NobitexOrderBookApi {
         }
 
         val lastPrice = readRequiredNumber(root, "lastTradePrice")
-
         if (lastPrice <= 0.0) {
             throw IOException("Invalid last trade price for $symbol")
         }
