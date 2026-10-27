@@ -1,172 +1,189 @@
 package ir.nobitextrader.app.strategy
 
-import kotlin.math.abs
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
-/**
- * FMC: Momentum + Flow Confirmation.
- *
- * Operational definition:
- * - Compare the latest closed candle's body with the prior candle bodies.
- * - Require directional momentum and above-average volume.
- * - Emit a signal only when both conditions agree.
- *
- * Volume is not proof of buyer/seller aggression. Real trade-flow data
- * should be used separately when available.
- *
- * Signals only; no orders are placed here.
- */
-class FmcStrategy(
-    private val lookbackCandles: Int = 10,
-    private val minimumBodyPercent: Double = 0.15,
-    private val minimumVolumeRatio: Double = 1.5,
-    private val rewardRiskRatio: Double = 2.0,
-    private val stopLossPercent: Double = 0.50
-) : TradingStrategy {
+class FmcStrategyTest {
 
-    override val id: StrategyId = StrategyId.FMC
+    private val strategy = FmcStrategy(
+        lookbackCandles = 3,
+        minimumBodyPercent = 0.15,
+        minimumVolumeRatio = 1.5,
+        rewardRiskRatio = 2.0,
+        stopLossPercent = 0.50
+    )
 
-    init {
-        require(lookbackCandles >= 2) {
-            "lookbackCandles must be at least 2"
-        }
-        require(minimumBodyPercent.isFinite() && minimumBodyPercent >= 0.0) {
-            "minimumBodyPercent must be finite and non-negative"
-        }
-        require(minimumVolumeRatio.isFinite() && minimumVolumeRatio > 0.0) {
-            "minimumVolumeRatio must be finite and positive"
-        }
-        require(rewardRiskRatio.isFinite() && rewardRiskRatio > 0.0) {
-            "rewardRiskRatio must be finite and positive"
-        }
-        require(stopLossPercent.isFinite() && stopLossPercent > 0.0) {
-            "stopLossPercent must be finite and positive"
-        }
+    @Test
+    fun insufficientCandlesReturnsInsufficientData() {
+        val result = strategy.evaluate(
+            StrategyContext(
+                symbol = "BTCUSDT",
+                candles = listOf(
+                    candle(1, 100.0, 101.0, 99.0, 100.5, 100.0),
+                    candle(2, 100.5, 101.0, 100.0, 100.7, 110.0)
+                )
+            )
+        )
+
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertEquals(SignalReason.INSUFFICIENT_DATA, result.reason)
     }
 
-    override fun evaluate(context: StrategyContext): StrategySignal {
-        require(context.symbol.isNotBlank()) {
-            "Symbol cannot be blank"
-        }
+    @Test
+    fun bullishMomentumWithHighVolumeReturnsLongSignal() {
+        val candles = listOf(
+            candle(1, 100.0, 100.5, 99.5, 100.1, 100.0),
+            candle(2, 100.1, 100.6, 99.8, 100.2, 100.0),
+            candle(3, 100.2, 100.7, 100.0, 100.3, 100.0),
+            candle(4, 100.3, 101.2, 100.2, 101.0, 200.0)
+        )
 
-        if (!context.enabled) {
-            return flat(context.symbol, "Strategy is disabled")
-        }
+        val result = strategy.evaluate(
+            StrategyContext(symbol = "BTCUSDT", candles = candles)
+        )
 
-        val candles = context.candles
+        assertEquals(TradeDirection.LONG, result.direction)
+        assertEquals(SignalReason.SETUP_CONFIRMED, result.reason)
+        assertNotNull(result.referencePrice)
+        assertNotNull(result.stopLossPrice)
+        assertNotNull(result.takeProfitPrice)
 
-        if (candles.size < lookbackCandles + 1) {
-            return StrategySignal(
-                strategyId = id,
-                symbol = context.symbol,
-                direction = TradeDirection.FLAT,
-                confidence = 0.0,
-                reason = SignalReason.INSUFFICIENT_DATA,
-                details = "Need ${lookbackCandles + 1} closed candles"
-            )
-        }
-
-        if (candles.any { !it.isValid() }) {
-            return StrategySignal(
-                strategyId = id,
-                symbol = context.symbol,
-                direction = TradeDirection.FLAT,
-                confidence = 0.0,
-                reason = SignalReason.INVALID_MARKET_DATA,
-                details = "Invalid OHLCV candle"
-            )
-        }
-
-        if (candles.zipWithNext().any { (a, b) ->
-                b.timestampMillis <= a.timestampMillis
-            }
-        ) {
-            return StrategySignal(
-                strategyId = id,
-                symbol = context.symbol,
-                direction = TradeDirection.FLAT,
-                confidence = 0.0,
-                reason = SignalReason.INVALID_MARKET_DATA,
-                details = "Candles must be strictly chronological"
-            )
-        }
-
-        val latest = candles.last()
-        val baseline = candles.dropLast(1).takeLast(lookbackCandles)
-
-        val averageVolume = baseline.map { it.volume }.average()
-        if (!averageVolume.isFinite() || averageVolume <= 0.0) {
-            return flat(context.symbol, "Baseline volume is zero or invalid")
-        }
-
-        val volumeRatio = latest.volume / averageVolume
-        val bodyPercent = abs(latest.close - latest.open) /
-            latest.open * 100.0
-
-        if (bodyPercent < minimumBodyPercent ||
-            volumeRatio < minimumVolumeRatio
-        ) {
-            return flat(
-                context.symbol,
-                "Momentum or volume confirmation threshold not met"
-            )
-        }
-
-        val entry = latest.close
-        val stopDistance = entry * stopLossPercent / 100.0
-
-        if (!stopDistance.isFinite() || stopDistance <= 0.0) {
-            return flat(context.symbol, "Invalid stop distance")
-        }
-
-        val score = (
-            0.5 +
-                (bodyPercent / (minimumBodyPercent * 4.0).coerceAtLeast(0.01)) * 0.2 +
-                (volumeRatio / minimumVolumeRatio).coerceAtMost(2.0) * 0.1
-            ).coerceIn(0.5, 0.9)
-
-        if (latest.close > latest.open) {
-            return StrategySignal(
-                strategyId = id,
-                symbol = context.symbol,
-                direction = TradeDirection.LONG,
-                confidence = score,
-                reason = SignalReason.SETUP_CONFIRMED,
-                referencePrice = entry,
-                stopLossPrice = entry - stopDistance,
-                takeProfitPrice = entry + stopDistance * rewardRiskRatio,
-                details = "Bullish momentum; body=${bodyPercent}%; volumeRatio=$volumeRatio"
-            )
-        }
-
-        if (latest.close < latest.open) {
-            val target = entry - stopDistance * rewardRiskRatio
-
-            if (target <= 0.0 || !target.isFinite()) {
-                return flat(context.symbol, "Invalid short target price")
-            }
-
-            return StrategySignal(
-                strategyId = id,
-                symbol = context.symbol,
-                direction = TradeDirection.SHORT,
-                confidence = score,
-                reason = SignalReason.SETUP_CONFIRMED,
-                referencePrice = entry,
-                stopLossPrice = entry + stopDistance,
-                takeProfitPrice = target,
-                details = "Bearish momentum; body=${bodyPercent}%; volumeRatio=$volumeRatio"
-            )
-        }
-
-        return flat(context.symbol, "Latest candle has no directional body")
+        assertTrue(result.stopLossPrice!! < result.referencePrice!!)
+        assertTrue(result.takeProfitPrice!! > result.referencePrice!!)
+        assertTrue(result.confidence in 0.5..0.9)
     }
 
-    private fun flat(symbol: String, details: String) = StrategySignal(
-        strategyId = id,
-        symbol = symbol,
-        direction = TradeDirection.FLAT,
-        confidence = 0.0,
-        reason = SignalReason.NO_SETUP,
-        details = details
+    @Test
+    fun bearishMomentumWithHighVolumeReturnsShortSignal() {
+        val candles = listOf(
+            candle(1, 100.0, 100.5, 99.5, 100.1, 100.0),
+            candle(2, 100.1, 100.6, 99.8, 100.2, 100.0),
+            candle(3, 100.2, 100.7, 100.0, 100.3, 100.0),
+            candle(4, 101.0, 101.1, 99.8, 100.0, 200.0)
+        )
+
+        val result = strategy.evaluate(
+            StrategyContext(symbol = "BTCUSDT", candles = candles)
+        )
+
+        assertEquals(TradeDirection.SHORT, result.direction)
+        assertEquals(SignalReason.SETUP_CONFIRMED, result.reason)
+        assertNotNull(result.referencePrice)
+        assertNotNull(result.stopLossPrice)
+        assertNotNull(result.takeProfitPrice)
+
+        assertTrue(result.stopLossPrice!! > result.referencePrice!!)
+        assertTrue(result.takeProfitPrice!! < result.referencePrice!!)
+        assertTrue(result.takeProfitPrice!! > 0.0)
+    }
+
+    @Test
+    fun lowVolumeReturnsNoSetup() {
+        val candles = listOf(
+            candle(1, 100.0, 100.5, 99.5, 100.1, 100.0),
+            candle(2, 100.1, 100.6, 99.8, 100.2, 100.0),
+            candle(3, 100.2, 100.7, 100.0, 100.3, 100.0),
+            candle(4, 100.3, 101.2, 100.2, 101.0, 100.0)
+        )
+
+        val result = strategy.evaluate(
+            StrategyContext(symbol = "BTCUSDT", candles = candles)
+        )
+
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertEquals(SignalReason.NO_SETUP, result.reason)
+    }
+
+    @Test
+    fun disabledStrategyReturnsNoSetup() {
+        val result = strategy.evaluate(
+            StrategyContext(
+                symbol = "BTCUSDT",
+                candles = validCandles(),
+                enabled = false
+            )
+        )
+
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertEquals(SignalReason.NO_SETUP, result.reason)
+        assertTrue(result.details.contains("disabled", ignoreCase = true))
+    }
+
+    @Test
+    fun invalidCandleReturnsInvalidMarketData() {
+        val candles = listOf(
+            candle(1, 100.0, 100.5, 99.5, 100.1, 100.0),
+            candle(2, 100.1, 100.6, 99.8, 100.2, 100.0),
+            candle(3, 100.2, 100.7, 100.0, 100.3, 100.0),
+            candle(4, 100.3, 99.0, 100.2, 101.0, 200.0)
+        )
+
+        val result = strategy.evaluate(
+            StrategyContext(symbol = "BTCUSDT", candles = candles)
+        )
+
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertEquals(SignalReason.INVALID_MARKET_DATA, result.reason)
+    }
+
+    @Test
+    fun nonChronologicalCandlesReturnInvalidMarketData() {
+        val candles = listOf(
+            candle(1, 100.0, 100.5, 99.5, 100.1, 100.0),
+            candle(3, 100.1, 100.6, 99.8, 100.2, 100.0),
+            candle(2, 100.2, 100.7, 100.0, 100.3, 100.0),
+            candle(4, 100.3, 101.2, 100.2, 101.0, 200.0)
+        )
+
+        val result = strategy.evaluate(
+            StrategyContext(symbol = "BTCUSDT", candles = candles)
+        )
+
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertEquals(SignalReason.INVALID_MARKET_DATA, result.reason)
+    }
+
+    @Test
+    fun flatLatestCandleDoesNotGenerateDirectionalSignal() {
+        val candles = listOf(
+            candle(1, 100.0, 100.5, 99.5, 100.1, 100.0),
+            candle(2, 100.1, 100.6, 99.8, 100.2, 100.0),
+            candle(3, 100.2, 100.7, 100.0, 100.3, 100.0),
+            candle(4, 100.5, 101.0, 100.0, 100.5, 200.0)
+        )
+
+        val result = strategy.evaluate(
+            StrategyContext(symbol = "BTCUSDT", candles = candles)
+        )
+
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertNotEquals(SignalReason.SETUP_CONFIRMED, result.reason)
+    }
+
+    private fun validCandles(): List<Candle> = listOf(
+        candle(1, 100.0, 100.5, 99.5, 100.1, 100.0),
+        candle(2, 100.1, 100.6, 99.8, 100.2, 100.0),
+        candle(3, 100.2, 100.7, 100.0, 100.3, 100.0),
+        candle(4, 100.3, 101.2, 100.2, 101.0, 200.0)
+    )
+
+    private fun candle(
+        timestamp: Long,
+        open: Double,
+        high: Double,
+        low: Double,
+        close: Double,
+        volume: Double
+    ) = Candle(
+        timestampMillis = timestamp,
+        open = open,
+        high = high,
+        low = low,
+        close = close,
+        volume = volume
     )
 }
