@@ -1,3 +1,4 @@
+
 package ir.nobitextrader.app.scanner
 
 import ir.nobitextrader.app.data.NobitexOrderBookApi
@@ -43,6 +44,7 @@ object MarketScanner {
             .map { it.trim().uppercase(Locale.ROOT) }
             .filter { it.matches(symbolPattern) }
             .distinct()
+            .take(policy.maxMarketsPerBatch)
 
         val total = validSymbols.size
         var completed = 0
@@ -79,23 +81,23 @@ object MarketScanner {
         policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT,
         onProgress: ((completed: Int, total: Int) -> Unit)? = null
     ): List<MarketScanResult> {
-        val results = mutableListOf<MarketScanResult>()
-
         val snapshots = NobitexOrderBookApi.fetchAll(
-            timeoutMillis = policy.requestTimeoutMillis,
-            onProgress = { completed, total ->
-                onProgress?.invoke(completed, total)
-            }
+            timeoutMillis = policy.requestTimeoutMillis
         )
 
-        val total = snapshots.size
+        val validSnapshots = snapshots
+            .filter { it.symbol.matches(symbolPattern) }
+            .distinctBy { it.symbol }
+            .take(policy.maxMarketsPerBatch)
+
+        val total = validSnapshots.size
+        val results = mutableListOf<MarketScanResult>()
+
         onProgress?.invoke(0, total)
 
-        snapshots.forEachIndexed { index, snapshot ->
+        validSnapshots.forEachIndexed { index, snapshot ->
             try {
-                if (snapshot.symbol.matches(symbolPattern)) {
-                    results.add(toScanResult(snapshot))
-                }
+                results.add(toScanResult(snapshot))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -105,9 +107,9 @@ object MarketScanner {
                         e.message ?: "خطای پردازش دفتر سفارش"
                     )
                 )
+            } finally {
+                onProgress?.invoke(index + 1, total)
             }
-
-            onProgress?.invoke(index + 1, total)
         }
 
         if (results.none { it.success }) {
