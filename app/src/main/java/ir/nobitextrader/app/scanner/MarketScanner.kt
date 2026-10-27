@@ -1,10 +1,10 @@
-
 package ir.nobitextrader.app.scanner
 
 import ir.nobitextrader.app.data.NobitexOrderBookApi
 import ir.nobitextrader.app.data.OrderBookSnapshot
 import java.io.IOException
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 
 enum class MarketSortMode {
     SPREAD_LOW_TO_HIGH,
@@ -35,7 +35,8 @@ object MarketScanner {
     )
 
     suspend fun scan(
-        symbols: List<String> = defaultMarkets
+        symbols: List<String> = defaultMarkets,
+        policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT
     ): List<MarketScanResult> {
         val validSymbols = symbols
             .map { it.trim().uppercase(Locale.ROOT) }
@@ -44,30 +45,38 @@ object MarketScanner {
 
         return validSymbols.map { symbol ->
             try {
-                toScanResult(NobitexOrderBookApi.fetch(symbol))
+                toScanResult(
+                    NobitexOrderBookApi.fetch(
+                        symbol = symbol,
+                        timeoutMillis = policy.requestTimeoutMillis
+                    )
+                )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                MarketScanResult(
-                    symbol = symbol,
-                    lastPrice = 0.0,
-                    bestBid = 0.0,
-                    bestAsk = 0.0,
-                    spreadPercent = 0.0,
-                    bidLiquidityTop5 = 0.0,
-                    askLiquidityTop5 = 0.0,
-                    success = false,
-                    error = e.message ?: "خطای دریافت اطلاعات بازار"
+                failedResult(
+                    symbol,
+                    e.message ?: "خطای دریافت اطلاعات بازار"
                 )
             }
         }
     }
 
-    suspend fun scanAll(): List<MarketScanResult> {
-        val results = NobitexOrderBookApi.fetchAll()
+    suspend fun scanAll(
+        policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT
+    ): List<MarketScanResult> {
+        val snapshots = NobitexOrderBookApi.fetchAll(
+            timeoutMillis = policy.requestTimeoutMillis
+        )
+
+        val results = snapshots
             .filter { it.symbol.matches(symbolPattern) }
             .distinctBy { it.symbol }
             .map { snapshot ->
                 try {
                     toScanResult(snapshot)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     failedResult(
                         snapshot.symbol,
