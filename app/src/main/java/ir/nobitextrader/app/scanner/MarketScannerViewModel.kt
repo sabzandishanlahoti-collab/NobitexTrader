@@ -33,6 +33,9 @@ class MarketScannerViewModel : ViewModel() {
     private var scanJob: Job? = null
     private var autoRefreshJob: Job? = null
 
+    // Keep the complete scan results separate from the displayed results.
+    private var allResults: List<MarketScanResult> = emptyList()
+
     fun scanMarkets(symbols: List<String>? = null) {
         if (scanJob?.isActive == true) return
 
@@ -53,15 +56,18 @@ class MarketScannerViewModel : ViewModel() {
                     }
                 }
 
+                allResults = results
+
                 val current = _uiState.value
-                val sorted = MarketScanner.sortResults(
-                    results,
-                    current.sortMode
+                val displayed = buildDisplayedResults(
+                    results = allResults,
+                    sortMode = current.sortMode,
+                    filterMode = current.filterMode
                 )
 
                 _uiState.value = current.copy(
                     isScanning = false,
-                    results = sorted,
+                    results = displayed,
                     errorMessage = null,
                     completedCount = results.size,
                     totalCount = results.size
@@ -71,27 +77,53 @@ class MarketScannerViewModel : ViewModel() {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
-                    errorMessage = e.message ?: "اسکن بازار ناموفق بود."
+                    errorMessage = e.message
+                        ?: "اسکن بازار ناموفق بود."
                 )
             }
         }
     }
 
+    private fun buildDisplayedResults(
+        results: List<MarketScanResult>,
+        sortMode: MarketSortMode,
+        filterMode: MarketResultFilterMode
+    ): List<MarketScanResult> {
+        val sorted = MarketScanner.sortResults(results, sortMode)
+
+        return MarketResultFilter.apply(sorted, filterMode)
+    }
+
     fun setSortMode(mode: MarketSortMode) {
         val current = _uiState.value
+
         _uiState.value = current.copy(
             sortMode = mode,
-            results = MarketScanner.sortResults(current.results, mode)
+            results = buildDisplayedResults(
+                results = allResults,
+                sortMode = mode,
+                filterMode = current.filterMode
+            )
         )
     }
 
     fun setFilterMode(mode: MarketResultFilterMode) {
-        _uiState.value = _uiState.value.copy(filterMode = mode)
+        val current = _uiState.value
+
+        _uiState.value = current.copy(
+            filterMode = mode,
+            results = buildDisplayedResults(
+                results = allResults,
+                sortMode = current.sortMode,
+                filterMode = mode
+            )
+        )
     }
 
     fun setRefreshInterval(intervalMs: Long) {
         _uiState.value = _uiState.value.copy(
-            refreshIntervalMs = MarketRefreshPolicy.normalizeInterval(intervalMs)
+            refreshIntervalMs =
+                MarketRefreshPolicy.normalizeInterval(intervalMs)
         )
 
         if (_uiState.value.autoRefreshEnabled) {
@@ -137,6 +169,7 @@ class MarketScannerViewModel : ViewModel() {
     fun clearResults() {
         scanJob?.cancel()
         scanJob = null
+        allResults = emptyList()
 
         _uiState.value = _uiState.value.copy(
             isScanning = false,
