@@ -1,6 +1,6 @@
-
 package ir.nobitextrader.app.data
 
+import ir.nobitextrader.app.scanner.MarketRefreshPolicy
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -59,20 +59,25 @@ object NobitexOrderBookApi {
 
     @Throws(IOException::class)
     fun fetch(
-        symbol: String = "BTCIRT"
+        symbol: String = "BTCIRT",
+        timeoutMillis: Long = MarketRefreshPolicy.DEFAULT.requestTimeoutMillis
     ): OrderBookSnapshot {
         val normalizedSymbol = normalizeSymbol(symbol)
-        val root = getJson("$BASE_URL$normalizedSymbol")
+        val root = getJson(
+            url = "$BASE_URL$normalizedSymbol",
+            timeoutMillis = timeoutMillis
+        )
         return parseSnapshot(normalizedSymbol, root)
     }
 
-    /**
-     * Fetches order books from Nobitex's public all-markets endpoint.
-     * Invalid markets are skipped; no synthetic market data is created.
-     */
     @Throws(IOException::class)
-    fun fetchAll(): List<OrderBookSnapshot> {
-        val root = getJson("${BASE_URL}all")
+    fun fetchAll(
+        timeoutMillis: Long = MarketRefreshPolicy.DEFAULT.requestTimeoutMillis
+    ): List<OrderBookSnapshot> {
+        val root = getJson(
+            url = "${BASE_URL}all",
+            timeoutMillis = timeoutMillis
+        )
         val markets = mutableListOf<OrderBookSnapshot>()
         val keys = root.keys()
 
@@ -86,7 +91,7 @@ object NobitexOrderBookApi {
             try {
                 markets.add(parseSnapshot(symbol, market))
             } catch (_: IOException) {
-                // Skip malformed market data.
+                // Ignore malformed market entries.
             }
         }
 
@@ -99,14 +104,24 @@ object NobitexOrderBookApi {
         return markets.distinctBy { it.symbol }
     }
 
-    private fun getJson(url: String): JSONObject {
+    private fun getJson(
+        url: String,
+        timeoutMillis: Long
+    ): JSONObject {
+        if (timeoutMillis !in 1_000L..60_000L) {
+            throw IllegalArgumentException(
+                "timeoutMillis must be between 1 and 60 seconds"
+            )
+        }
+
+        val timeout = timeoutMillis.toInt()
         val connection =
             URL(url).openConnection() as HttpURLConnection
 
         try {
             connection.requestMethod = "GET"
-            connection.connectTimeout = 15_000
-            connection.readTimeout = 20_000
+            connection.connectTimeout = timeout
+            connection.readTimeout = timeout
             connection.setRequestProperty(
                 "Accept",
                 "application/json"
@@ -138,8 +153,7 @@ object NobitexOrderBookApi {
                 )
             }
 
-            val status = root.optString("status", "")
-            if (status != "ok") {
+            if (root.optString("status", "") != "ok") {
                 throw IOException(
                     "Nobitex returned an unsuccessful status"
                 )
@@ -183,10 +197,7 @@ object NobitexOrderBookApi {
             )
         }
 
-        val bestBid = bids.first().price
-        val bestAsk = asks.first().price
-
-        if (bestBid > bestAsk) {
+        if (bids.first().price > asks.first().price) {
             throw IOException(
                 "Crossed order book for $symbol"
             )
@@ -232,18 +243,12 @@ object NobitexOrderBookApi {
         val value = when (val raw = json.get(key)) {
             is Number -> raw.toDouble()
             is String -> raw.toDoubleOrNull()
-                ?: throw IOException(
-                    "Invalid numeric field: $key"
-                )
-            else -> throw IOException(
-                "Invalid numeric field: $key"
-            )
+                ?: throw IOException("Invalid numeric field: $key")
+            else -> throw IOException("Invalid numeric field: $key")
         }
 
         if (!value.isFinite()) {
-            throw IOException(
-                "Non-finite numeric field: $key"
-            )
+            throw IOException("Non-finite numeric field: $key")
         }
 
         return value
@@ -275,10 +280,7 @@ object NobitexOrderBookApi {
                 amount > 0.0
             ) {
                 levels.add(
-                    OrderBookLevel(
-                        price = price,
-                        amount = amount
-                    )
+                    OrderBookLevel(price, amount)
                 )
             }
         }
