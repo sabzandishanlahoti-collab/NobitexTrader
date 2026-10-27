@@ -13,23 +13,72 @@ object MarketResultFilter {
         results: List<MarketScanResult>,
         mode: MarketResultFilterMode
     ): List<MarketScanResult> {
-        return when (mode) {
-            MarketResultFilterMode.ALL -> results
+        return results.filter { result ->
+            if (!isValidResult(result)) {
+                return@filter false
+            }
 
-            MarketResultFilterMode.SPREAD_UNDER_ONE_PERCENT ->
-                results.filter { result ->
-                    result.success &&
-                        result.spreadPercent.isFinite() &&
-                        result.spreadPercent >= 0.0 &&
-                        result.spreadPercent <= 1.0
-                }
+            when (mode) {
+                MarketResultFilterMode.ALL -> true
 
-            MarketResultFilterMode.POSITIVE_LIQUIDITY ->
-                results.filter { result ->
-                    result.success &&
-                        (result.bidLiquidityTop5 > 0.0 ||
-                            result.askLiquidityTop5 > 0.0)
-                }
+                MarketResultFilterMode.SPREAD_UNDER_ONE_PERCENT ->
+                    result.spreadPercent <= 1.0
+
+                MarketResultFilterMode.POSITIVE_LIQUIDITY ->
+                    result.bidLiquidityTop5 > 0.0 ||
+                        result.askLiquidityTop5 > 0.0
+            }
         }
+    }
+
+    private fun isValidResult(
+        result: MarketScanResult
+    ): Boolean {
+        if (!result.success) return false
+
+        if (result.symbol.isBlank()) return false
+
+        if (!result.lastPriceOrValid()) return false
+
+        if (
+            !result.bestBid.isFinite() ||
+            result.bestBid <= 0.0
+        ) {
+            return false
+        }
+
+        if (
+            !result.bestAsk.isFinite() ||
+            result.bestAsk < result.bestBid
+        ) {
+            return false
+        }
+
+        if (
+            !result.spreadPercent.isFinite() ||
+            result.spreadPercent < 0.0
+        ) {
+            return false
+        }
+
+        if (
+            !result.bidLiquidityTop5.isFinite() ||
+            result.bidLiquidityTop5 < 0.0
+        ) {
+            return false
+        }
+
+        if (
+            !result.askLiquidityTop5.isFinite() ||
+            result.askLiquidityTop5 < 0.0
+        ) {
+            return false
+        }
+
+        return true
+    }
+
+    private fun MarketScanResult.lastPriceOrValid(): Boolean {
+        return lastPrice.isFinite() && lastPrice > 0.0
     }
 }
