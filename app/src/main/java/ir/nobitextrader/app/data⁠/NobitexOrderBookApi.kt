@@ -29,6 +29,8 @@ data class OrderBookSnapshot(
         get() {
             val bid = bestBid ?: return null
             val ask = bestAsk ?: return null
+            if (!bid.isFinite() || !ask.isFinite()) return null
+            if (bid <= 0.0 || ask < bid) return null
             return ask - bid
         }
 
@@ -36,9 +38,15 @@ data class OrderBookSnapshot(
         get() {
             val bid = bestBid ?: return null
             val ask = bestAsk ?: return null
-            val mid = (bid + ask) / 2.0
-            if (mid <= 0.0) return null
-            return ((ask - bid) / mid) * 100.0
+
+            if (!bid.isFinite() || !ask.isFinite()) return null
+            if (bid <= 0.0 || ask < bid) return null
+
+            val mid = bid / 2.0 + ask / 2.0
+            if (!mid.isFinite() || mid <= 0.0) return null
+
+            val result = ((ask - bid) / mid) * 100.0
+            return result.takeIf { it.isFinite() && it >= 0.0 }
         }
 }
 
@@ -47,41 +55,38 @@ object NobitexOrderBookApi {
     private const val BASE_URL =
         "https://apiv2.nobitex.ir/v3/orderbook/"
 
+    private val symbolPattern = Regex("[A-Z0-9]{3,20}")
+
     @Throws(IOException::class)
     fun fetch(
         symbol: String = "BTCIRT"
     ): OrderBookSnapshot {
         val normalizedSymbol = normalizeSymbol(symbol)
-
         val root = getJson("$BASE_URL$normalizedSymbol")
-
         return parseSnapshot(normalizedSymbol, root)
     }
 
     /**
-     * Fetches all market order books through one public API request.
-     * No prices or market symbols are generated locally.
+     * Fetches order books from Nobitex's public all-markets endpoint.
+     * Invalid markets are skipped; no synthetic market data is created.
      */
     @Throws(IOException::class)
     fun fetchAll(): List<OrderBookSnapshot> {
         val root = getJson("${BASE_URL}all")
-
         val markets = mutableListOf<OrderBookSnapshot>()
         val keys = root.keys()
 
         while (keys.hasNext()) {
             val symbol = keys.next()
 
-            if (!symbol.matches(Regex("[A-Z0-9]{3,20}"))) {
-                continue
-            }
+            if (!symbolPattern.matches(symbol)) continue
 
             val market = root.optJSONObject(symbol) ?: continue
 
             try {
                 markets.add(parseSnapshot(symbol, market))
             } catch (_: IOException) {
-                // Skip malformed market data; do not fabricate a result.
+                // Skip malformed market data.
             }
         }
 
@@ -91,7 +96,7 @@ object NobitexOrderBookApi {
             )
         }
 
-        return markets
+        return markets.distinctBy { it.symbol }
     }
 
     private fun getJson(url: String): JSONObject {
@@ -109,28 +114,32 @@ object NobitexOrderBookApi {
 
             val statusCode = connection.responseCode
 
-            val stream =
-                if (statusCode in 200..299) {
-                    connection.inputStream
-                } else {
-                    connection.errorStream
-                } ?: throw IOException(
-                    "Nobitex HTTP error: $statusCode"
-                )
-
-            val response = stream
-                .bufferedReader(Charsets.UTF_8)
-                .use { it.readText() }
-
             if (statusCode !in 200..299) {
+                val errorBody = connection.errorStream
+                    ?.bufferedReader(Charsets.UTF_8)
+                    ?.use { it.readText() }
+                    .orEmpty()
+
                 throw IOException(
-                    "Nobitex HTTP $statusCode: $response"
+                    "Nobitex HTTP $statusCode: $errorBody"
                 )
             }
 
-            val root = JSONObject(response)
+            val response = connection.inputStream
+                .bufferedReader(Charsets.UTF_8)
+                .use { it.readText() }
 
-            if (root.optString("status") != "ok") {
+            val root = try {
+                JSONObject(response)
+            } catch (e: Exception) {
+                throw IOException(
+                    "Nobitex returned invalid JSON",
+                    e
+                )
+            }
+
+            val status = root.optString("status", "")
+            if (status != "ok") {
                 throw IOException(
                     "Nobitex returned an unsuccessful status"
                 )
@@ -145,10 +154,10 @@ object NobitexOrderBookApi {
     private fun normalizeSymbol(symbol: String): String {
         val normalized = symbol.trim().uppercase()
 
-        require(
-            normalized.matches(Regex("[A-Z0-9]{3,20}"))
-        ) {
-            "Invalid market symbol"
+        if (!symbolPattern.matches(normalized)) {
+            throw IllegalArgumentException(
+                "Invalid market symbol"
+            )
         }
 
         return normalized
@@ -158,15 +167,48 @@ object NobitexOrderBookApi {
         symbol: String,
         root: JSONObject
     ): OrderBookSnapshot {
-        val bids = parseLevels(root.optJSONArray("bids"), "bids")
-        val asks = parseLevels(root.optJSONArray("asks"), "asks")
+        val bids = parseLevels(
+            root.optJSONArray("bids"),
+            "bids"
+        ).sortedByDescending { it.price }
 
-        val lastPrice = root.optString(
-            "lastTradePrice",
-            ""
-        ).toDoubleOrNull() ?: 0.0
+        val asks = parseLevels(
+            root.optJSONArray("asks"),
+            "asks"
+        ).sortedBy { it.price }
+
+        if (bids.isEmpty() || asks.isEmpty()) {
+            throw IOException(
+                "Empty or invalid order book for $symbol"
+            )
+        }
+
+        val bestBid = bids.first().price
+        val bestAsk = asks.first().price
+
+        if (bestBid > bestAsk) {
+            throw IOException(
+                "Crossed order book for $symbol"
+            )
+        }
+
+        val lastPrice = readRequiredNumber(
+            root,
+            "lastTradePrice"
+        )
+
+        if (lastPrice <= 0.0) {
+            throw IOException(
+                "Invalid last trade price for $symbol"
+            )
+        }
 
         val lastUpdate = root.optLong("lastUpdate", 0L)
+        if (lastUpdate < 0L) {
+            throw IOException(
+                "Invalid last update timestamp for $symbol"
+            )
+        }
 
         return OrderBookSnapshot(
             symbol = symbol,
@@ -175,6 +217,36 @@ object NobitexOrderBookApi {
             bids = bids,
             asks = asks
         )
+    }
+
+    private fun readRequiredNumber(
+        json: JSONObject,
+        key: String
+    ): Double {
+        if (!json.has(key) || json.isNull(key)) {
+            throw IOException(
+                "Missing order book field: $key"
+            )
+        }
+
+        val value = when (val raw = json.get(key)) {
+            is Number -> raw.toDouble()
+            is String -> raw.toDoubleOrNull()
+                ?: throw IOException(
+                    "Invalid numeric field: $key"
+                )
+            else -> throw IOException(
+                "Invalid numeric field: $key"
+            )
+        }
+
+        if (!value.isFinite()) {
+            throw IOException(
+                "Non-finite numeric field: $key"
+            )
+        }
+
+        return value
     }
 
     private fun parseLevels(
@@ -193,17 +265,14 @@ object NobitexOrderBookApi {
             val item = array.optJSONArray(index) ?: continue
             if (item.length() < 2) continue
 
-            val price = item.optString(0)
-                .toDoubleOrNull() ?: continue
-
-            val amount = item.optString(1)
-                .toDoubleOrNull() ?: continue
+            val price = readLevelNumber(item, 0) ?: continue
+            val amount = readLevelNumber(item, 1) ?: continue
 
             if (
                 price.isFinite() &&
                 amount.isFinite() &&
                 price > 0.0 &&
-                amount >= 0.0
+                amount > 0.0
             ) {
                 levels.add(
                     OrderBookLevel(
@@ -215,5 +284,20 @@ object NobitexOrderBookApi {
         }
 
         return levels
+    }
+
+    private fun readLevelNumber(
+        item: JSONArray,
+        index: Int
+    ): Double? {
+        val raw = item.opt(index)
+
+        val value = when (raw) {
+            is Number -> raw.toDouble()
+            is String -> raw.toDoubleOrNull()
+            else -> null
+        } ?: return null
+
+        return value.takeIf { it.isFinite() }
     }
 }
