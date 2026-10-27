@@ -1,33 +1,36 @@
 package ir.nobitextrader.app.scanner
 
 data class MarketRefreshPolicy(
-    val refreshIntervalMillis: Long = 30_000L,
+    val refreshIntervalMillis: Long = DEFAULT_INTERVAL_MS,
     val requestTimeoutMillis: Long = 10_000L,
     val maxMarketsPerBatch: Int = 10
 ) {
     init {
-        require(refreshIntervalMillis in MIN_REFRESH_INTERVAL_MILLIS..MAX_REFRESH_INTERVAL_MILLIS) {
+        require(refreshIntervalMillis in MIN_REFRESH_INTERVAL_MS..MAX_REFRESH_INTERVAL_MS) {
             "refreshIntervalMillis must be between 5 seconds and 1 hour"
         }
-
-        require(requestTimeoutMillis in MIN_REQUEST_TIMEOUT_MILLIS..MAX_REQUEST_TIMEOUT_MILLIS) {
+        require(requestTimeoutMillis in 1_000L..60_000L) {
             "requestTimeoutMillis must be between 1 and 60 seconds"
         }
-
-        require(maxMarketsPerBatch in MIN_MARKETS_PER_BATCH..MAX_MARKETS_PER_BATCH) {
+        require(maxMarketsPerBatch in 1..50) {
             "maxMarketsPerBatch must be between 1 and 50"
         }
     }
 
     companion object {
-        const val MIN_REFRESH_INTERVAL_MILLIS = 5_000L
-        const val MAX_REFRESH_INTERVAL_MILLIS = 3_600_000L
+        const val DEFAULT_INTERVAL_MS = 30_000L
+        const val MIN_REFRESH_INTERVAL_MS = 5_000L
+        const val MAX_REFRESH_INTERVAL_MS = 3_600_000L
 
-        const val MIN_REQUEST_TIMEOUT_MILLIS = 1_000L
-        const val MAX_REQUEST_TIMEOUT_MILLIS = 60_000L
-
-        const val MIN_MARKETS_PER_BATCH = 1
-        const val MAX_MARKETS_PER_BATCH = 50
+        /**
+         * Keeps a supplied refresh interval within the supported range.
+         */
+        fun normalizeInterval(intervalMillis: Long): Long {
+            return intervalMillis.coerceIn(
+                MIN_REFRESH_INTERVAL_MS,
+                MAX_REFRESH_INTERVAL_MS
+            )
+        }
 
         val DEFAULT = MarketRefreshPolicy()
 
