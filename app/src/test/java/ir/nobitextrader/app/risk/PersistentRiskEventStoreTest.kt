@@ -21,7 +21,10 @@ class PersistentRiskEventStoreTest {
     fun setUp() {
         directory = Files.createTempDirectory("risk-history-test").toFile()
         historyFile = File(directory, "risk-events.log")
-        store = PersistentRiskEventStore(historyFile, maxEvents = 3)
+        store = PersistentRiskEventStore(
+            file = historyFile,
+            maxEvents = 3
+        )
     }
 
     @After
@@ -32,25 +35,33 @@ class PersistentRiskEventStoreTest {
     private fun event(
         timestamp: Long,
         message: String = "event-$timestamp"
-    ) = RiskEvent(
-        type = RiskEventType.TRADE_REJECTED,
-        timestampMillis = timestamp,
-        message = message,
-        equityUsd = 1000.0,
-        drawdownPct = 2.0,
-        dailyLossPct = 1.0,
-        symbol = "BTCUSDT"
-    )
+    ): RiskEvent {
+        return RiskEvent(
+            type = RiskEventType.TRADE_REJECTED,
+            timestampMillis = timestamp,
+            message = message,
+            equityUsd = 1000.0,
+            drawdownPct = 2.0,
+            dailyLossPct = 1.0,
+            symbol = "BTCUSDT"
+        )
+    }
 
     @Test
     fun appendPersistsEventAcrossStoreInstances() {
         store.append(event(1))
         store.append(event(2))
 
-        val reopened = PersistentRiskEventStore(historyFile, maxEvents = 3)
+        val reopened = PersistentRiskEventStore(
+            file = historyFile,
+            maxEvents = 3
+        )
 
         assertEquals(2, reopened.count())
-        assertEquals(listOf(2L, 1L), reopened.latest().map { it.timestampMillis })
+        assertEquals(
+            listOf(2L, 1L),
+            reopened.latest().map { it.timestampMillis }
+        )
     }
 
     @Test
@@ -94,21 +105,40 @@ class PersistentRiskEventStoreTest {
         historyFile.writeText("not-a-valid-risk-event-record\n")
 
         var thrown = false
+
         try {
             store.load()
         } catch (exception: IOException) {
             thrown = true
         }
 
-        assertTrue("Corrupt history must not be silently accepted", thrown)
+        assertTrue(
+            "Corrupt history must not be silently accepted",
+            thrown
+        )
     }
 
     @Test
-    fun serializerPreservesTabsAndNewlinesInMessage() {
-        val original = event(123, "first\tsecond\nthird")
+    fun serializerPreservesSpecialCharactersAcrossFileRoundTrip() {
+        val originalMessage =
+            "خط اول\nخط دوم\rخط سوم\t100% تکمیل شد"
+
+        val original = event(
+            timestamp = 123,
+            message = originalMessage
+        )
 
         store.append(original)
 
-        assertEquals(original, store.load().single())
+        val reopened = PersistentRiskEventStore(
+            file = historyFile,
+            maxEvents = 3
+        )
+
+        val loaded = reopened.load()
+
+        assertEquals(1, loaded.size)
+        assertEquals(original, loaded.single())
+        assertEquals(originalMessage, loaded.single().message)
     }
 }
