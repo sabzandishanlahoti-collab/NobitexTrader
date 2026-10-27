@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -29,11 +30,12 @@ fun MarketScannerScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val visibleResults = state.results
 
-    val visibleResults = MarketResultFilter.apply(
-        results = state.results,
-        mode = state.filterMode
-    )
+    val successfulCount = visibleResults.count { it.success }
+    val failedCount = visibleResults.count { !it.success }
+    val filteredOutCount =
+        (state.totalCount - visibleResults.size).coerceAtLeast(0)
 
     Column(
         modifier = modifier
@@ -136,7 +138,10 @@ fun MarketScannerScreen(
             }
         }
 
-        Text("مرتب‌سازی نتایج:", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "مرتب‌سازی نتایج:",
+            style = MaterialTheme.typography.titleMedium
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -144,18 +149,24 @@ fun MarketScannerScreen(
         ) {
             SortButton(
                 text = "ترکیبی",
-                selected = state.sortMode == MarketSortMode.BALANCED_PRIORITY,
+                selected = state.sortMode ==
+                    MarketSortMode.BALANCED_PRIORITY,
                 modifier = Modifier.weight(1f)
             ) {
-                viewModel.setSortMode(MarketSortMode.BALANCED_PRIORITY)
+                viewModel.setSortMode(
+                    MarketSortMode.BALANCED_PRIORITY
+                )
             }
 
             SortButton(
                 text = "اختلاف کمتر",
-                selected = state.sortMode == MarketSortMode.SPREAD_LOW_TO_HIGH,
+                selected = state.sortMode ==
+                    MarketSortMode.SPREAD_LOW_TO_HIGH,
                 modifier = Modifier.weight(1f)
             ) {
-                viewModel.setSortMode(MarketSortMode.SPREAD_LOW_TO_HIGH)
+                viewModel.setSortMode(
+                    MarketSortMode.SPREAD_LOW_TO_HIGH
+                )
             }
         }
 
@@ -186,7 +197,10 @@ fun MarketScannerScreen(
             }
         }
 
-        Text("فیلتر بازار:", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "فیلتر بازار:",
+            style = MaterialTheme.typography.titleMedium
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -194,10 +208,13 @@ fun MarketScannerScreen(
         ) {
             SortButton(
                 text = "همه",
-                selected = state.filterMode == MarketResultFilterMode.ALL,
+                selected = state.filterMode ==
+                    MarketResultFilterMode.ALL,
                 modifier = Modifier.weight(1f)
             ) {
-                viewModel.setFilterMode(MarketResultFilterMode.ALL)
+                viewModel.setFilterMode(
+                    MarketResultFilterMode.ALL
+                )
             }
 
             SortButton(
@@ -223,9 +240,21 @@ fun MarketScannerScreen(
             )
         }
 
-        Text(
-            text = "نمایش ${visibleResults.size} از ${state.totalCount} بازار"
-        )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "تعداد نتایج: ${state.totalCount}",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text("نتایج نمایش‌داده‌شده: ${visibleResults.size}")
+                Text("بازارهای موفق: $successfulCount")
+                Text("بازارهای ناموفق: $failedCount")
+                Text("حذف‌شده توسط فیلتر: $filteredOutCount")
+            }
+        }
 
         state.errorMessage?.let { message ->
             Text(
@@ -235,11 +264,15 @@ fun MarketScannerScreen(
         }
 
         if (state.isScanning) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 CircularProgressIndicator()
                 Text("در حال دریافت اطلاعات بازار...")
                 Spacer(modifier = Modifier.weight(1f))
-                OutlinedButton(onClick = { viewModel.cancelScan() }) {
+                OutlinedButton(
+                    onClick = { viewModel.cancelScan() }
+                ) {
                     Text("توقف اسکن فعلی")
                 }
             }
@@ -311,7 +344,11 @@ private fun MarketResultCard(result: MarketScanResult) {
                 Text("بهترین فروش: ${formatNumber(result.bestAsk)}")
                 Text(
                     "اختلاف قیمت: ${
-                        String.format(Locale.US, "%.4f", result.spreadPercent)
+                        String.format(
+                            Locale.US,
+                            "%.4f",
+                            result.spreadPercent
+                        )
                     }٪"
                 )
                 Text(
