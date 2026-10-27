@@ -1,7 +1,9 @@
+
 package ir.nobitextrader.app.scanner
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import ir.nobitextrader.app.TraderSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,14 +33,45 @@ class MarketScannerViewModel : ViewModel() {
 
     private var scanJob: Job? = null
     private var autoRefreshJob: Job? = null
-    private var scanGeneration: Long = 0L
-
+    private var scanGeneration = 0L
     private var allResults: List<MarketScanResult> = emptyList()
+
+    private var requestTimeoutMs = MarketRefreshPolicy.DEFAULT.requestTimeoutMillis
+    private var maxMarketsPerBatch = MarketRefreshPolicy.DEFAULT.maxMarketsPerBatch
+    private var maxSpreadPercent = 1f
+
+    fun applySettings(settings: TraderSettings) {
+        requestTimeoutMs =
+            settings.requestTimeoutSeconds.coerceIn(1, 60) * 1_000L
+
+        maxMarketsPerBatch =
+            settings.maxMarketsPerBatch.coerceIn(1, 50)
+
+        maxSpreadPercent =
+            settings.maxSpreadPercent.coerceIn(0.1f, 10f)
+
+        setRefreshInterval(settings.refreshSeconds.coerceIn(5, 3600) * 1_000L)
+
+        if (settings.autoScanEnabled != _uiState.value.autoRefreshEnabled) {
+            if (settings.autoScanEnabled) {
+                _uiState.value = _uiState.value.copy(autoRefreshEnabled = true)
+                startAutoRefresh()
+                scanMarkets()
+            } else {
+                stopAutoRefresh()
+            }
+        }
+    }
 
     fun scanMarkets(symbols: List<String>? = null) {
         if (scanJob?.isActive == true) return
 
         val generation = ++scanGeneration
+        val policy = MarketRefreshPolicy(
+            refreshIntervalMillis = _uiState.value.refreshIntervalMs,
+            requestTimeoutMillis = requestTimeoutMs,
+            maxMarketsPerBatch = maxMarketsPerBatch
+        )
 
         scanJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
@@ -54,11 +87,8 @@ class MarketScannerViewModel : ViewModel() {
                         MarketScanner.scanAll()
                     } else {
                         MarketScanner.scan(
-                            symbols = symbols,
-                            policy = MarketRefreshPolicy(
-                                refreshIntervalMillis =
-                                    _uiState.value.refreshIntervalMs
-                            )
+                            symbols = symbols.take(maxMarketsPerBatch),
+                            policy = policy
                         )
                     }
                 }
@@ -66,8 +96,8 @@ class MarketScannerViewModel : ViewModel() {
                 if (generation != scanGeneration) return@launch
 
                 allResults = results
-
                 val current = _uiState.value
+
                 _uiState.value = current.copy(
                     isScanning = false,
                     results = buildDisplayedResults(
@@ -85,15 +115,12 @@ class MarketScannerViewModel : ViewModel() {
                 if (generation == scanGeneration) {
                     _uiState.value = _uiState.value.copy(
                         isScanning = false,
-                        errorMessage = e.message
-                            ?: "اسکن بازار ناموفق بود."
+                        errorMessage = e.message ?: "اسکن بازار ناموفق بود."
                     )
                 }
             } finally {
                 if (generation == scanGeneration) {
-                    _uiState.value = _uiState.value.copy(
-                        isScanning = false
-                    )
+                    _uiState.value = _uiState.value.copy(isScanning = false)
                     scanJob = null
                 }
             }
@@ -105,8 +132,12 @@ class MarketScannerViewModel : ViewModel() {
         sortMode: MarketSortMode,
         filterMode: MarketResultFilterMode
     ): List<MarketScanResult> {
+        val spreadFiltered = results.filter {
+            !it.success || it.spreadPercent <= maxSpreadPercent
+        }
+
         return MarketResultFilter.apply(
-            MarketScanner.sortResults(results, sortMode),
+            MarketScanner.sortResults(spreadFiltered, sortMode),
             filterMode
         )
     }
@@ -115,11 +146,7 @@ class MarketScannerViewModel : ViewModel() {
         val current = _uiState.value
         _uiState.value = current.copy(
             sortMode = mode,
-            results = buildDisplayedResults(
-                allResults,
-                mode,
-                current.filterMode
-            )
+            results = buildDisplayedResults(allResults, mode, current.filterMode)
         )
     }
 
@@ -127,21 +154,14 @@ class MarketScannerViewModel : ViewModel() {
         val current = _uiState.value
         _uiState.value = current.copy(
             filterMode = mode,
-            results = buildDisplayedResults(
-                allResults,
-                current.sortMode,
-                mode
-            )
+            results = buildDisplayedResults(allResults, current.sortMode, mode)
         )
     }
 
     fun setRefreshInterval(intervalMs: Long) {
-        val normalized =
-            MarketRefreshPolicy.normalizeInterval(intervalMs)
+        val normalized = MarketRefreshPolicy.normalizeInterval(intervalMs)
 
-        _uiState.value = _uiState.value.copy(
-            refreshIntervalMs = normalized
-        )
+        _uiState.value = _uiState.value.copy(refreshIntervalMs = normalized)
 
         if (_uiState.value.autoRefreshEnabled) {
             startAutoRefresh()
@@ -152,9 +172,7 @@ class MarketScannerViewModel : ViewModel() {
         if (_uiState.value.autoRefreshEnabled) {
             stopAutoRefresh()
         } else {
-            _uiState.value = _uiState.value.copy(
-                autoRefreshEnabled = true
-            )
+            _uiState.value = _uiState.value.copy(autoRefreshEnabled = true)
             startAutoRefresh()
             scanMarkets()
         }
@@ -162,14 +180,10 @@ class MarketScannerViewModel : ViewModel() {
 
     private fun startAutoRefresh() {
         autoRefreshJob?.cancel()
-
         autoRefreshJob = viewModelScope.launch {
             while (_uiState.value.autoRefreshEnabled) {
                 delay(_uiState.value.refreshIntervalMs)
-
-                if (_uiState.value.autoRefreshEnabled) {
-                    scanMarkets()
-                }
+                if (_uiState.value.autoRefreshEnabled) scanMarkets()
             }
         }
     }
@@ -177,16 +191,12 @@ class MarketScannerViewModel : ViewModel() {
     private fun stopAutoRefresh() {
         autoRefreshJob?.cancel()
         autoRefreshJob = null
-
-        _uiState.value = _uiState.value.copy(
-            autoRefreshEnabled = false
-        )
+        _uiState.value = _uiState.value.copy(autoRefreshEnabled = false)
     }
 
     fun clearResults() {
         cancelScan()
         allResults = emptyList()
-
         _uiState.value = _uiState.value.copy(
             isScanning = false,
             results = emptyList(),
@@ -200,10 +210,7 @@ class MarketScannerViewModel : ViewModel() {
         scanGeneration++
         scanJob?.cancel()
         scanJob = null
-
-        _uiState.value = _uiState.value.copy(
-            isScanning = false
-        )
+        _uiState.value = _uiState.value.copy(isScanning = false)
     }
 
     override fun onCleared() {
