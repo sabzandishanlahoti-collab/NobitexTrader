@@ -1,4 +1,3 @@
-
 package ir.nobitextrader.app.risk
 
 import kotlin.math.max
@@ -104,11 +103,16 @@ class RiskEngine(
             request.spreadPct
         )
 
-        if (nonNegativeValues.any {
-                !it.isFinite() || it < 0.0
-            }
-        ) {
+        if (nonNegativeValues.any { !it.isFinite() || it < 0.0 }) {
             return reject("Invalid capital, cost, or risk data")
+        }
+
+        if (request.freeCapitalUsd > request.equityUsd) {
+            return reject("Free capital exceeds account equity")
+        }
+
+        if (request.openRiskUsd > request.equityUsd) {
+            return reject("Open risk exceeds account equity")
         }
 
         if (!request.stopLossPct.isFinite() ||
@@ -164,7 +168,7 @@ class RiskEngine(
             config.riskPerTradePct *
                 if (protectiveMode) 0.5 else 1.0
 
-        val riskBudgetUsd =
+        val requestedRiskBudgetUsd =
             request.equityUsd * effectiveRiskPct / 100.0
 
         val maxTotalRiskUsd =
@@ -174,28 +178,35 @@ class RiskEngine(
         val remainingRiskUsd =
             max(0.0, maxTotalRiskUsd - request.openRiskUsd)
 
-        if (remainingRiskUsd <= 0.0 ||
-            riskBudgetUsd > remainingRiskUsd
-        ) {
+        if (remainingRiskUsd <= 0.0) {
             return reject(
-                reason = "Total open-risk limit would be exceeded",
+                reason = "Total open-risk limit reached",
                 drawdownPct = drawdownPct,
                 dailyLossPct = dailyLossPct,
                 protectiveMode = protectiveMode
             )
         }
 
-        // Include stop distance plus estimated round-trip costs.
+        // Reduce the trade's risk budget when only part of the
+        // total open-risk allowance remains.
+        val effectiveRiskBudgetUsd =
+            min(requestedRiskBudgetUsd, remainingRiskUsd)
+
         val totalRiskPct =
             request.stopLossPct +
                 request.estimatedRoundTripCostsPct
 
         if (!totalRiskPct.isFinite() || totalRiskPct <= 0.0) {
-            return reject("Invalid total trade risk")
+            return reject(
+                reason = "Invalid total trade risk",
+                drawdownPct = drawdownPct,
+                dailyLossPct = dailyLossPct,
+                protectiveMode = protectiveMode
+            )
         }
 
         val sizeAllowedByRisk =
-            riskBudgetUsd / (totalRiskPct / 100.0)
+            effectiveRiskBudgetUsd / (totalRiskPct / 100.0)
 
         val sizeAllowedByCapital =
             request.equityUsd *
@@ -209,18 +220,25 @@ class RiskEngine(
         if (!positionSizeUsd.isFinite() ||
             positionSizeUsd <= 0.0
         ) {
-            return reject("Calculated position size is invalid")
+            return reject(
+                reason = "Calculated position size is invalid",
+                drawdownPct = drawdownPct,
+                dailyLossPct = dailyLossPct,
+                protectiveMode = protectiveMode
+            )
         }
 
         return RiskDecision(
             approved = true,
             reason = if (protectiveMode) {
                 "Approved in protective mode with reduced risk"
+            } else if (effectiveRiskBudgetUsd < requestedRiskBudgetUsd) {
+                "Approved with reduced size due to remaining open-risk allowance"
             } else {
                 "Approved by risk engine"
             },
             positionSizeUsd = positionSizeUsd,
-            riskBudgetUsd = riskBudgetUsd,
+            riskBudgetUsd = effectiveRiskBudgetUsd,
             drawdownPct = drawdownPct,
             dailyLossPct = dailyLossPct,
             protectiveMode = protectiveMode
