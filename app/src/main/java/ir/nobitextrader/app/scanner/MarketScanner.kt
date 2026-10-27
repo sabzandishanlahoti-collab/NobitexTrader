@@ -36,54 +36,79 @@ object MarketScanner {
 
     suspend fun scan(
         symbols: List<String> = defaultMarkets,
-        policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT
+        policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT,
+        onProgress: ((completed: Int, total: Int) -> Unit)? = null
     ): List<MarketScanResult> {
         val validSymbols = symbols
             .map { it.trim().uppercase(Locale.ROOT) }
             .filter { it.matches(symbolPattern) }
             .distinct()
 
-        return validSymbols.map { symbol ->
+        val total = validSymbols.size
+        var completed = 0
+        val results = mutableListOf<MarketScanResult>()
+
+        onProgress?.invoke(0, total)
+
+        for (symbol in validSymbols) {
             try {
-                toScanResult(
-                    NobitexOrderBookApi.fetch(
-                        symbol = symbol,
-                        timeoutMillis = policy.requestTimeoutMillis
-                    )
+                val snapshot = NobitexOrderBookApi.fetch(
+                    symbol = symbol,
+                    timeoutMillis = policy.requestTimeoutMillis
                 )
+                results.add(toScanResult(snapshot))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                failedResult(
-                    symbol,
-                    e.message ?: "خطای دریافت اطلاعات بازار"
+                results.add(
+                    failedResult(
+                        symbol,
+                        e.message ?: "خطای دریافت اطلاعات بازار"
+                    )
                 )
+            } finally {
+                completed++
+                onProgress?.invoke(completed, total)
             }
         }
+
+        return results
     }
 
     suspend fun scanAll(
-        policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT
+        policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT,
+        onProgress: ((completed: Int, total: Int) -> Unit)? = null
     ): List<MarketScanResult> {
+        val results = mutableListOf<MarketScanResult>()
+
         val snapshots = NobitexOrderBookApi.fetchAll(
-            timeoutMillis = policy.requestTimeoutMillis
+            timeoutMillis = policy.requestTimeoutMillis,
+            onProgress = { completed, total ->
+                onProgress?.invoke(completed, total)
+            }
         )
 
-        val results = snapshots
-            .filter { it.symbol.matches(symbolPattern) }
-            .distinctBy { it.symbol }
-            .map { snapshot ->
-                try {
-                    toScanResult(snapshot)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
+        val total = snapshots.size
+        onProgress?.invoke(0, total)
+
+        snapshots.forEachIndexed { index, snapshot ->
+            try {
+                if (snapshot.symbol.matches(symbolPattern)) {
+                    results.add(toScanResult(snapshot))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                results.add(
                     failedResult(
                         snapshot.symbol,
                         e.message ?: "خطای پردازش دفتر سفارش"
                     )
-                }
+                )
             }
+
+            onProgress?.invoke(index + 1, total)
+        }
 
         if (results.none { it.success }) {
             throw IOException("هیچ دفتر سفارش معتبری دریافت نشد.")
