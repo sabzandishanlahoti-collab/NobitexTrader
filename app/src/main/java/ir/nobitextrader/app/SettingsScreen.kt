@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -20,7 +21,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -28,12 +28,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import java.util.Locale
 
 private const val SETTINGS_PREFS = "nobitex_trader_settings"
 
 data class TraderSettings(
     val useEnglish: Boolean = false,
     val darkTheme: Boolean = false,
+    val autoScanEnabled: Boolean = false,
     val refreshSeconds: Int = 30,
     val requestTimeoutSeconds: Int = 10,
     val maxMarketsPerBatch: Int = 10,
@@ -49,6 +51,7 @@ object TraderSettingsStore {
         return TraderSettings(
             useEnglish = p.getBoolean("use_english", false),
             darkTheme = p.getBoolean("dark_theme", false),
+            autoScanEnabled = p.getBoolean("auto_scan_enabled", false),
             refreshSeconds = p.getInt("refresh_seconds", 30).coerceIn(5, 3600),
             requestTimeoutSeconds = p.getInt("timeout_seconds", 10).coerceIn(1, 60),
             maxMarketsPerBatch = p.getInt("markets_per_batch", 10).coerceIn(1, 50),
@@ -60,10 +63,14 @@ object TraderSettingsStore {
         prefs(context).edit()
             .putBoolean("use_english", settings.useEnglish)
             .putBoolean("dark_theme", settings.darkTheme)
+            .putBoolean("auto_scan_enabled", settings.autoScanEnabled)
             .putInt("refresh_seconds", settings.refreshSeconds.coerceIn(5, 3600))
             .putInt("timeout_seconds", settings.requestTimeoutSeconds.coerceIn(1, 60))
             .putInt("markets_per_batch", settings.maxMarketsPerBatch.coerceIn(1, 50))
-            .putFloat("max_spread_percent", settings.maxSpreadPercent.coerceIn(0.1f, 10f))
+            .putFloat(
+                "max_spread_percent",
+                settings.maxSpreadPercent.coerceIn(0.1f, 10f)
+            )
             .apply()
     }
 
@@ -87,25 +94,29 @@ fun SettingsScreen(
         TraderSettingsStore.save(context, updated)
     }
 
+    val english = settings.useEnglish
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Text(
-            text = if (settings.useEnglish) "Settings" else "تنظیمات",
+            text = if (english) "Trading Bot Settings" else "تنظیمات ربات معامله‌گر",
             style = MaterialTheme.typography.headlineMedium
         )
 
+        HorizontalDivider()
+
         Text(
-            text = if (settings.useEnglish) "General" else "عمومی",
+            text = if (english) "Appearance" else "ظاهر برنامه",
             style = MaterialTheme.typography.titleMedium
         )
 
         SettingSwitch(
-            title = if (settings.useEnglish) "English language" else "زبان انگلیسی",
+            title = if (english) "English language" else "زبان انگلیسی",
             checked = settings.useEnglish,
             onCheckedChange = {
                 updateSettings(settings.copy(useEnglish = it))
@@ -113,59 +124,86 @@ fun SettingsScreen(
         )
 
         SettingSwitch(
-            title = if (settings.useEnglish) "Dark theme preference" else "ترجیح تم تاریک",
+            title = if (english) "Dark theme" else "تم تاریک",
             checked = settings.darkTheme,
             onCheckedChange = {
                 updateSettings(settings.copy(darkTheme = it))
             }
         )
 
+        HorizontalDivider()
+
         Text(
-            text = if (settings.useEnglish) "Exchange connection" else "اتصال به صرافی",
+            text = if (english) "Automatic Scanning" else "اسکن خودکار",
             style = MaterialTheme.typography.titleMedium
         )
 
-        Text(
-            if (settings.useEnglish) {
-                "Request timeout: ${settings.requestTimeoutSeconds} seconds"
-            } else {
-                "مهلت درخواست: ${settings.requestTimeoutSeconds} ثانیه"
+        SettingSwitch(
+            title = if (english) "Enable automatic scanning" else "فعال‌سازی اسکن خودکار",
+            checked = settings.autoScanEnabled,
+            onCheckedChange = {
+                updateSettings(settings.copy(autoScanEnabled = it))
             }
         )
 
-        Slider(
-            value = settings.requestTimeoutSeconds.toFloat(),
-            onValueChange = {
-                updateSettings(settings.copy(requestTimeoutSeconds = it.toInt().coerceIn(1, 60)))
-            },
-            valueRange = 1f..60f,
-            steps = 58
-        )
-
         Text(
-            text = if (settings.useEnglish) "Market scanner" else "اسکن بازارها",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        Text(
-            if (settings.useEnglish) {
+            text = if (english) {
                 "Refresh interval: ${settings.refreshSeconds} seconds"
             } else {
-                "فاصلهٔ به‌روزرسانی: ${settings.refreshSeconds} ثانیه"
+                "فاصله بین اسکن‌ها: ${settings.refreshSeconds} ثانیه"
             }
         )
 
         Slider(
             value = settings.refreshSeconds.toFloat(),
             onValueChange = {
-                updateSettings(settings.copy(refreshSeconds = it.toInt().coerceIn(5, 3600)))
+                updateSettings(
+                    settings.copy(
+                        refreshSeconds = it.toInt().coerceIn(5, 3600)
+                    )
+                )
             },
-            valueRange = 5f..300f,
-            steps = 58
+            valueRange = 5f..3600f,
+            steps = 0
+        )
+
+        HorizontalDivider()
+
+        Text(
+            text = if (english) "Nobitex Connection" else "اتصال به نوبیتکس",
+            style = MaterialTheme.typography.titleMedium
         )
 
         Text(
-            if (settings.useEnglish) {
+            text = if (english) {
+                "Request timeout: ${settings.requestTimeoutSeconds} seconds"
+            } else {
+                "مهلت پاسخ درخواست: ${settings.requestTimeoutSeconds} ثانیه"
+            }
+        )
+
+        Slider(
+            value = settings.requestTimeoutSeconds.toFloat(),
+            onValueChange = {
+                updateSettings(
+                    settings.copy(
+                        requestTimeoutSeconds = it.toInt().coerceIn(1, 60)
+                    )
+                )
+            },
+            valueRange = 1f..60f,
+            steps = 58
+        )
+
+        HorizontalDivider()
+
+        Text(
+            text = if (english) "Market Filters" else "فیلترهای بازار",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        Text(
+            text = if (english) {
                 "Markets per batch: ${settings.maxMarketsPerBatch}"
             } else {
                 "تعداد بازار در هر دسته: ${settings.maxMarketsPerBatch}"
@@ -175,39 +213,57 @@ fun SettingsScreen(
         Slider(
             value = settings.maxMarketsPerBatch.toFloat(),
             onValueChange = {
-                updateSettings(settings.copy(maxMarketsPerBatch = it.toInt().coerceIn(1, 50)))
+                updateSettings(
+                    settings.copy(
+                        maxMarketsPerBatch = it.toInt().coerceIn(1, 50)
+                    )
+                )
             },
             valueRange = 1f..50f,
             steps = 48
         )
 
         Text(
-            if (settings.useEnglish) {
-                "Maximum spread filter: ${"%.1f".format(settings.maxSpreadPercent)}%"
+            text = if (english) {
+                String.format(
+                    Locale.US,
+                    "Maximum spread: %.1f%%",
+                    settings.maxSpreadPercent
+                )
             } else {
-                "حداکثر اختلاف قیمت برای فیلتر: ${"%.1f".format(settings.maxSpreadPercent)}٪"
+                String.format(
+                    Locale.US,
+                    "حداکثر اختلاف قیمت: %.1f٪",
+                    settings.maxSpreadPercent
+                )
             }
         )
 
         Slider(
             value = settings.maxSpreadPercent,
             onValueChange = {
-                updateSettings(settings.copy(maxSpreadPercent = it.coerceIn(0.1f, 10f)))
+                updateSettings(
+                    settings.copy(
+                        maxSpreadPercent = it.coerceIn(0.1f, 10f)
+                    )
+                )
             },
             valueRange = 0.1f..10f,
             steps = 98
         )
 
+        HorizontalDivider()
+
         Text(
-            text = if (settings.useEnglish) "Advanced" else "پیشرفته",
+            text = if (english) "Settings Information" else "وضعیت تنظیمات",
             style = MaterialTheme.typography.titleMedium
         )
 
         Text(
-            text = if (settings.useEnglish) {
-                "These values are saved locally. They will affect scanning only after being connected to the scanner logic."
+            text = if (english) {
+                "Settings are saved on this device. Options affect actual scanning only when the scanner reads these saved values."
             } else {
-                "این مقادیر روی دستگاه ذخیره می‌شوند. اثر آن‌ها بر اسکنر پس از اتصال به منطق اسکن اعمال خواهد شد."
+                "تنظیمات روی دستگاه ذخیره می‌شوند. برای اثرگذاری روی اسکن واقعی، موتور اسکن باید این مقادیر را بخواند."
             },
             style = MaterialTheme.typography.bodyMedium
         )
@@ -215,18 +271,18 @@ fun SettingsScreen(
         OutlinedButton(
             onClick = {
                 TraderSettingsStore.reset(context)
-                settings = TraderSettings()
+                updateSettings(TraderSettings())
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(if (settings.useEnglish) "Reset settings" else "بازنشانی تنظیمات")
+            Text(if (english) "Reset to defaults" else "بازگردانی تنظیمات پیش‌فرض")
         }
 
         Button(
             onClick = onBack,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(if (settings.useEnglish) "Back" else "بازگشت")
+            Text(if (english) "Back" else "بازگشت")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -246,8 +302,10 @@ private fun SettingSwitch(
     ) {
         Text(
             text = title,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge
         )
+
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange
