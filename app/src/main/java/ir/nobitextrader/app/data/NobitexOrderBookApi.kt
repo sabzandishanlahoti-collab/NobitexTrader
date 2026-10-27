@@ -60,7 +60,8 @@ object NobitexOrderBookApi {
     @Throws(IOException::class)
     fun fetch(
         symbol: String = "BTCIRT",
-        timeoutMillis: Long = MarketRefreshPolicy.DEFAULT.requestTimeoutMillis
+        timeoutMillis: Long =
+            MarketRefreshPolicy.DEFAULT.requestTimeoutMillis
     ): OrderBookSnapshot {
         val normalizedSymbol = normalizeSymbol(symbol)
         val root = getJson(
@@ -72,26 +73,38 @@ object NobitexOrderBookApi {
 
     @Throws(IOException::class)
     fun fetchAll(
-        timeoutMillis: Long = MarketRefreshPolicy.DEFAULT.requestTimeoutMillis
+        timeoutMillis: Long =
+            MarketRefreshPolicy.DEFAULT.requestTimeoutMillis,
+        onProgress: ((completed: Int, total: Int) -> Unit)? = null
     ): List<OrderBookSnapshot> {
         val root = getJson(
             url = "${BASE_URL}all",
             timeoutMillis = timeoutMillis
         )
-        val markets = mutableListOf<OrderBookSnapshot>()
+
+        val validEntries = mutableListOf<Pair<String, JSONObject>>()
         val keys = root.keys()
 
         while (keys.hasNext()) {
             val symbol = keys.next()
-
             if (!symbolPattern.matches(symbol)) continue
 
             val market = root.optJSONObject(symbol) ?: continue
+            validEntries.add(symbol to market)
+        }
 
+        val total = validEntries.size
+        val markets = mutableListOf<OrderBookSnapshot>()
+
+        onProgress?.invoke(0, total)
+
+        validEntries.forEachIndexed { index, (symbol, market) ->
             try {
                 markets.add(parseSnapshot(symbol, market))
             } catch (_: IOException) {
                 // Ignore malformed market entries.
+            } finally {
+                onProgress?.invoke(index + 1, total)
             }
         }
 
@@ -169,9 +182,7 @@ object NobitexOrderBookApi {
         val normalized = symbol.trim().uppercase()
 
         if (!symbolPattern.matches(normalized)) {
-            throw IllegalArgumentException(
-                "Invalid market symbol"
-            )
+            throw IllegalArgumentException("Invalid market symbol")
         }
 
         return normalized
@@ -198,20 +209,13 @@ object NobitexOrderBookApi {
         }
 
         if (bids.first().price > asks.first().price) {
-            throw IOException(
-                "Crossed order book for $symbol"
-            )
+            throw IOException("Crossed order book for $symbol")
         }
 
-        val lastPrice = readRequiredNumber(
-            root,
-            "lastTradePrice"
-        )
+        val lastPrice = readRequiredNumber(root, "lastTradePrice")
 
         if (lastPrice <= 0.0) {
-            throw IOException(
-                "Invalid last trade price for $symbol"
-            )
+            throw IOException("Invalid last trade price for $symbol")
         }
 
         val lastUpdate = root.optLong("lastUpdate", 0L)
@@ -235,9 +239,7 @@ object NobitexOrderBookApi {
         key: String
     ): Double {
         if (!json.has(key) || json.isNull(key)) {
-            throw IOException(
-                "Missing order book field: $key"
-            )
+            throw IOException("Missing order book field: $key")
         }
 
         val value = when (val raw = json.get(key)) {
@@ -259,9 +261,7 @@ object NobitexOrderBookApi {
         fieldName: String
     ): List<OrderBookLevel> {
         if (array == null) {
-            throw IOException(
-                "Missing order book field: $fieldName"
-            )
+            throw IOException("Missing order book field: $fieldName")
         }
 
         val levels = mutableListOf<OrderBookLevel>()
@@ -279,9 +279,7 @@ object NobitexOrderBookApi {
                 price > 0.0 &&
                 amount > 0.0
             ) {
-                levels.add(
-                    OrderBookLevel(price, amount)
-                )
+                levels.add(OrderBookLevel(price, amount))
             }
         }
 
