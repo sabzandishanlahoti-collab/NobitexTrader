@@ -1,5 +1,4 @@
 
-
 package ir.nobitextrader.app
 
 import android.os.Bundle
@@ -26,11 +25,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.rememberCoroutineScope
 import ir.nobitextrader.app.data.MarketStats
 import ir.nobitextrader.app.data.NobitexCandlesApi
 import ir.nobitextrader.app.data.NobitexMarketApi
@@ -53,7 +52,6 @@ class MainActivity : ComponentActivity() {
             var settings by remember {
                 mutableStateOf(TraderSettingsStore.load(this@MainActivity))
             }
-
             var screen by remember {
                 mutableStateOf(AppScreen.HOME)
             }
@@ -178,11 +176,7 @@ class MainActivity : ComponentActivity() {
                                             } catch (e: Exception) {
                                                 marketError =
                                                     e.message
-                                                        ?: if (english) {
-                                                            "Unknown market data error"
-                                                        } else {
-                                                            "خطای نامشخص دریافت اطلاعات بازار"
-                                                        }
+                                                        ?: "Unknown market data error"
                                             } finally {
                                                 marketLoading = false
                                             }
@@ -209,11 +203,11 @@ class MainActivity : ComponentActivity() {
                                         if (english) "Market data received"
                                         else "دریافت اطلاعات بازار موفق بود"
                                     )
-                                    Text("${if (english) "Market" else "بازار"}: ${stats.market}")
-                                    Text("${if (english) "Last price" else "آخرین قیمت"}: ${stats.latest}")
-                                    Text("${if (english) "Best buy" else "بهترین خرید"}: ${stats.bestBuy}")
-                                    Text("${if (english) "Best sell" else "بهترین فروش"}: ${stats.bestSell}")
-                                    Text("${if (english) "Daily change" else "تغییر روزانه"}: ${stats.dayChange}%")
+                                    Text("Market: ${stats.market}")
+                                    Text("Last price: ${stats.latest}")
+                                    Text("Best buy: ${stats.bestBuy}")
+                                    Text("Best sell: ${stats.bestSell}")
+                                    Text("Daily change: ${stats.dayChange}%")
                                 }
 
                                 marketError?.let { message ->
@@ -252,7 +246,7 @@ class MainActivity : ComponentActivity() {
                                     Text(
                                         when {
                                             rawLoading && english ->
-                                                "Fetching raw API response..."
+                                                "Fetching raw response..."
                                             rawLoading ->
                                                 "در حال دریافت پاسخ خام..."
                                             english ->
@@ -266,18 +260,12 @@ class MainActivity : ComponentActivity() {
                                 rawResponse?.let { response ->
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        if (english) {
-                                            "Raw API response:"
-                                        } else {
-                                            "پاسخ خام API:"
-                                        },
-                                        style = MaterialTheme.typography.titleSmall
+                                        if (english) "Raw API response:"
+                                        else "پاسخ خام API:"
                                     )
                                     Text(
                                         text = response,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(4.dp),
+                                        modifier = Modifier.fillMaxWidth(),
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                 }
@@ -285,11 +273,7 @@ class MainActivity : ComponentActivity() {
                                 rawError?.let { message ->
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = if (english) {
-                                            "Raw API request failed: $message"
-                                        } else {
-                                            "خطای دریافت پاسخ خام: $message"
-                                        },
+                                        text = message,
                                         color = MaterialTheme.colorScheme.error
                                     )
                                 }
@@ -333,11 +317,7 @@ class MainActivity : ComponentActivity() {
                                             } catch (e: Exception) {
                                                 candleError =
                                                     e.message
-                                                        ?: if (english) {
-                                                            "Unknown candle API error"
-                                                        } else {
-                                                            "خطای نامشخص دریافت کندل"
-                                                        }
+                                                        ?: "Unknown candle API error"
                                             } finally {
                                                 candlesLoading = false
                                             }
@@ -358,7 +338,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
-                                if (candlesLoading || rawLoading) {
+                                if (candlesLoading || rawLoading || marketLoading) {
                                     Spacer(modifier = Modifier.height(12.dp))
                                     CircularProgressIndicator()
                                 }
@@ -366,140 +346,12 @@ class MainActivity : ComponentActivity() {
                                 candleCount?.let { count ->
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text(
-                                        if (english) {
-                                            "Candle request completed"
-                                        } else {
-                                            "درخواست کندل پایان یافت"
-                                        }
+                                        if (english) "Candle request completed"
+                                        else "درخواست کندل پایان یافت"
                                     )
                                     Text(
-                                        if (english) {
-                                            "Candles received: $count"
-                                        } else {
-                                            "تعداد کندل دریافتی: $count"
-                                        }
-                                    )
-
-                                    lastCandleTime?.let { time ->
-                                        Text(
-                                            if (english) {
-                                                "Latest candle time: $time"
-                                            } else {
-                                                "زمان آخرین کندل: $time"
-                                            }
-                                        )
-                                    }
-
-                                    if (count == 0) {
-                                        Text(
-                                            if (english) {
-                                                "The API returned no candles for this interval."
-                                            } else {
-                                                "API برای این بازه هیچ کندلی برنگرداند."
-                                            }
-                                        )
-                                    }
-                                }
-
-                                candleError?.let { message ->
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = if (english) {
-                                            "Candle request failed: $message"
-                                        } else {
-                                            "خطای دریافت کندل: $message"
-                                        },
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(20.dp))
-
-                                Text(
-                                    text = if (english) {
-                                        "Read-only tests. No orders are placed."
-                                    } else {
-                                        "این آزمایش‌ها فقط اطلاعات بازار و کندل را می‌خوانند و سفارشی ثبت نمی‌کنند."
-                                    },
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-                                                val candles =
-                                                    NobitexCandlesApi.fetchCandles(
-                                                        symbol = "BTCIRT",
-                                                        resolution = "60",
-                                                        fromUnixSeconds =
-                                                            nowSeconds - 24L * 60L * 60L,
-                                                        toUnixSeconds = nowSeconds
-                                                    )
-
-                                                candleCount = candles.size
-
-                                                lastCandleTime =
-                                                    candles.lastOrNull()?.let { candle ->
-                                                        SimpleDateFormat(
-                                                            "yyyy-MM-dd HH:mm:ss",
-                                                            Locale.getDefault()
-                                                        ).format(
-                                                            Date(candle.timestampMillis)
-                                                        )
-                                                    }
-                                            } catch (e: Exception) {
-                                                candleError =
-                                                    e.message
-                                                        ?: if (english) {
-                                                            "Unknown candle API error"
-                                                        } else {
-                                                            "خطای نامشخص دریافت کندل"
-                                                        }
-                                            } finally {
-                                                candlesLoading = false
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    Text(
-                                        when {
-                                            candlesLoading && english ->
-                                                "Fetching live candles..."
-                                            candlesLoading ->
-                                                "در حال دریافت کندل..."
-                                            english ->
-                                                "Test live BTC/IRT candles"
-                                            else ->
-                                                "آزمایش دریافت کندل واقعی BTC/IRT"
-                                        }
-                                    )
-                                }
-
-                                if (candlesLoading) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    CircularProgressIndicator()
-                                }
-
-                                candleCount?.let { count ->
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        if (english) {
-                                            "Candle request completed"
-                                        } else {
-                                            "درخواست کندل پایان یافت"
-                                        }
-                                    )
-                                    Text(
-                                        if (english) {
-                                            "Candles received: $count"
-                                        } else {
-                                            "تعداد کندل دریافتی: $count"
-                                        }
+                                        if (english) "Candles received: $count"
+                                        else "تعداد کندل دریافتی: $count"
                                     )
 
                                     lastCandleTime?.let { time ->
