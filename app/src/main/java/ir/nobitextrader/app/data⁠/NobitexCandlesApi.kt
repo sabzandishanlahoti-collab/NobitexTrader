@@ -9,6 +9,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 /**
  * Read-only client for Nobitex candle history.
@@ -42,11 +43,11 @@ object NobitexCandlesApi {
             "End time must be greater than start time"
         }
 
-        val encodedSymbol = java.net.URLEncoder.encode(
+        val encodedSymbol = URLEncoder.encode(
             symbol,
             Charsets.UTF_8.name()
         )
-        val encodedResolution = java.net.URLEncoder.encode(
+        val encodedResolution = URLEncoder.encode(
             resolution,
             Charsets.UTF_8.name()
         )
@@ -61,37 +62,67 @@ object NobitexCandlesApi {
         var connection: HttpURLConnection? = null
 
         try {
-            connection = (url.openConnection() as HttpURLConnection).apply {
+            connection = (url.openConnection()
+                as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = CONNECTION_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
                 setRequestProperty("Accept", "application/json")
-            }
-
-            val statusCode = connection.responseCode
-            if (statusCode !in 200..299) {
-                throw IOException(
-                    "Nobitex candle request failed: HTTP $statusCode"
+                setRequestProperty(
+                    "User-Agent",
+                    "TraderBot/NobitexTrader"
                 )
             }
 
-            val body = connection.inputStream
-                .bufferedReader(Charsets.UTF_8)
-                .use { it.readText() }
+            val statusCode = connection.responseCode
+            val contentType =
+                connection.getHeaderField("Content-Type") ?: "unknown"
+
+            val stream = if (statusCode in 200..299) {
+                connection.inputStream
+            } else {
+                connection.errorStream
+            }
+
+            val body = stream?.bufferedReader(Charsets.UTF_8)
+                ?.use { it.readText() }
+                .orEmpty()
+
+            if (statusCode !in 200..299) {
+                throw IOException(
+                    "Nobitex candle request failed: HTTP $statusCode; " +
+                        "content-type=$contentType; " +
+                        "body=${body.take(300)}"
+                )
+            }
 
             val root = try {
                 JSONObject(body)
             } catch (e: Exception) {
                 throw IOException(
-                    "Nobitex returned invalid candle JSON",
+                    "Nobitex returned invalid candle JSON; " +
+                        "content-type=$contentType; " +
+                        "body=${body.take(300)}",
                     e
                 )
             }
 
-            if (root.optString("s") != "ok") {
-                throw IOException(
-                    "Nobitex candle response status was not ok: " +
-                        root.optString("s")
+            when (root.optString("s")) {
+                "no_data" -> return@withContext emptyList<Candle>()
+
+                "error" -> throw IOException(
+                    "Nobitex candle API error: " +
+                        root.optString(
+                            "errmsg",
+                            "No error message supplied"
+                        )
+                )
+
+                "ok" -> Unit
+
+                else -> throw IOException(
+                    "Unexpected Nobitex candle response status: " +
+                        root.optString("s", "missing")
                 )
             }
 
@@ -119,9 +150,17 @@ object NobitexCandlesApi {
             val candles = ArrayList<Candle>(count)
 
             for (index in 0 until count) {
-                val timestampSeconds = times.getLong(index)
+                val timestampSeconds = try {
+                    times.getLong(index)
+                } catch (e: Exception) {
+                    throw IOException(
+                        "Invalid candle timestamp at index $index",
+                        e
+                    )
+                }
 
-                if (timestampSeconds < 0L ||
+                if (
+                    timestampSeconds <= 0L ||
                     timestampSeconds > Long.MAX_VALUE / 1000L
                 ) {
                     throw IOException(
@@ -147,12 +186,13 @@ object NobitexCandlesApi {
                 candles.add(candle)
             }
 
-            candles.sortedBy { candle -> candle.timestampMillis }
+            candles.sortedBy { it.timestampMillis }
         } catch (e: IOException) {
             throw e
         } catch (e: Exception) {
             throw IOException(
-                "Unable to fetch Nobitex candle history",
+                "Unable to fetch Nobitex candle history: " +
+                    (e.message ?: e.javaClass.simpleName),
                 e
             )
         } finally {
@@ -166,7 +206,7 @@ object NobitexCandlesApi {
     ): JSONArray {
         return root.optJSONArray(key)
             ?: throw IOException(
-                "Candle response is missing '$key'"
+                "Candle response is missing array '$key'"
             )
     }
 
@@ -175,7 +215,14 @@ object NobitexCandlesApi {
         index: Int,
         field: String
     ): Double {
-        val value = array.getDouble(index)
+        val value = try {
+            array.getDouble(index)
+        } catch (e: Exception) {
+            throw IOException(
+                "Candle field '$field' is not numeric at index $index",
+                e
+            )
+        }
 
         if (!value.isFinite()) {
             throw IOException(
