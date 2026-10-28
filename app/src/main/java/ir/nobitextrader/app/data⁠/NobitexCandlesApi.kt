@@ -1,6 +1,7 @@
 
 package ir.nobitextrader.app.data
 
+import ir.nobitextrader.app.strategy.Candle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -11,8 +12,7 @@ import java.net.URL
 
 /**
  * Read-only client for Nobitex candle history.
- *
- * No orders are submitted by this class.
+ * Does not submit orders.
  */
 object NobitexCandlesApi {
 
@@ -22,14 +22,6 @@ object NobitexCandlesApi {
     private const val CONNECTION_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 10_000
 
-    /**
-     * Fetches historical candles for a market.
-     *
-     * @param symbol Market symbol, for example BTCIRT.
-     * @param resolution UDF resolution, for example 60 or 240.
-     * @param fromUnixSeconds Start time in Unix seconds.
-     * @param toUnixSeconds End time in Unix seconds.
-     */
     suspend fun fetchCandles(
         symbol: String,
         resolution: String,
@@ -50,9 +42,18 @@ object NobitexCandlesApi {
             "End time must be greater than start time"
         }
 
+        val encodedSymbol = java.net.URLEncoder.encode(
+            symbol,
+            Charsets.UTF_8.name()
+        )
+        val encodedResolution = java.net.URLEncoder.encode(
+            resolution,
+            Charsets.UTF_8.name()
+        )
+
         val url = URL(
-            "$BASE_URL?symbol=$symbol" +
-                "&resolution=$resolution" +
+            "$BASE_URL?symbol=$encodedSymbol" +
+                "&resolution=$encodedResolution" +
                 "&from=$fromUnixSeconds" +
                 "&to=$toUnixSeconds"
         )
@@ -68,7 +69,6 @@ object NobitexCandlesApi {
             }
 
             val statusCode = connection.responseCode
-
             if (statusCode !in 200..299) {
                 throw IOException(
                     "Nobitex candle request failed: HTTP $statusCode"
@@ -95,18 +95,12 @@ object NobitexCandlesApi {
                 )
             }
 
-            val times = root.optJSONArray("t")
-                ?: throw IOException("Candle response is missing 't'")
-            val opens = root.optJSONArray("o")
-                ?: throw IOException("Candle response is missing 'o'")
-            val highs = root.optJSONArray("h")
-                ?: throw IOException("Candle response is missing 'h'")
-            val lows = root.optJSONArray("l")
-                ?: throw IOException("Candle response is missing 'l'")
-            val closes = root.optJSONArray("c")
-                ?: throw IOException("Candle response is missing 'c'")
-            val volumes = root.optJSONArray("v")
-                ?: throw IOException("Candle response is missing 'v'")
+            val times = requiredArray(root, "t")
+            val opens = requiredArray(root, "o")
+            val highs = requiredArray(root, "h")
+            val lows = requiredArray(root, "l")
+            val closes = requiredArray(root, "c")
+            val volumes = requiredArray(root, "v")
 
             val count = times.length()
 
@@ -127,6 +121,14 @@ object NobitexCandlesApi {
             for (index in 0 until count) {
                 val timestampSeconds = times.getLong(index)
 
+                if (timestampSeconds < 0L ||
+                    timestampSeconds > Long.MAX_VALUE / 1000L
+                ) {
+                    throw IOException(
+                        "Invalid candle timestamp at index $index"
+                    )
+                }
+
                 val candle = Candle(
                     timestampMillis = timestampSeconds * 1000L,
                     open = numberAt(opens, index, "o"),
@@ -142,10 +144,10 @@ object NobitexCandlesApi {
                     )
                 }
 
-                candles += candle
+                candles.add(candle)
             }
 
-            candles.sortedBy { it.timestampMillis }
+            candles.sortedBy { candle -> candle.timestampMillis }
         } catch (e: IOException) {
             throw e
         } catch (e: Exception) {
@@ -156,6 +158,16 @@ object NobitexCandlesApi {
         } finally {
             connection?.disconnect()
         }
+    }
+
+    private fun requiredArray(
+        root: JSONObject,
+        key: String
+    ): JSONArray {
+        return root.optJSONArray(key)
+            ?: throw IOException(
+                "Candle response is missing '$key'"
+            )
     }
 
     private fun numberAt(
