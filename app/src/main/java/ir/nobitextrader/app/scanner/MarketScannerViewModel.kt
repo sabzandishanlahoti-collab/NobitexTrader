@@ -57,14 +57,22 @@ class MarketScannerViewModel : ViewModel() {
         val refreshMs =
             settings.refreshSeconds.coerceIn(5, 3600) * 1_000L
 
-        setRefreshInterval(refreshMs)
+        val intervalChanged =
+            _uiState.value.refreshIntervalMs != refreshMs
+
+        _uiState.value = _uiState.value.copy(
+            refreshIntervalMs = refreshMs
+        )
 
         if (settings.autoScanEnabled) {
             if (!_uiState.value.autoRefreshEnabled) {
-                _uiState.value =
-                    _uiState.value.copy(autoRefreshEnabled = true)
+                _uiState.value = _uiState.value.copy(
+                    autoRefreshEnabled = true
+                )
                 startAutoRefresh()
                 scanMarkets()
+            } else if (intervalChanged) {
+                startAutoRefresh()
             }
         } else if (_uiState.value.autoRefreshEnabled) {
             stopAutoRefresh()
@@ -95,12 +103,25 @@ class MarketScannerViewModel : ViewModel() {
             try {
                 val results = withContext(Dispatchers.IO) {
                     if (symbols == null) {
-                        val all = MarketScanner.scanAll(policy)
-                        all.take(maxMarketsPerBatch)
+                        MarketScanner.scanAll(
+                            policy = policy,
+                            onProgress = { completed, total ->
+                                _uiState.value = _uiState.value.copy(
+                                    completedCount = completed,
+                                    totalCount = total
+                                )
+                            }
+                        )
                     } else {
                         MarketScanner.scan(
-                            symbols = symbols.take(maxMarketsPerBatch),
-                            policy = policy
+                            symbols = symbols,
+                            policy = policy,
+                            onProgress = { completed, total ->
+                                _uiState.value = _uiState.value.copy(
+                                    completedCount = completed,
+                                    totalCount = total
+                                )
+                            }
                         )
                     }
                 }
@@ -133,8 +154,9 @@ class MarketScannerViewModel : ViewModel() {
                 }
             } finally {
                 if (generation == scanGeneration) {
-                    _uiState.value =
-                        _uiState.value.copy(isScanning = false)
+                    _uiState.value = _uiState.value.copy(
+                        isScanning = false
+                    )
                     scanJob = null
                 }
             }
@@ -195,8 +217,9 @@ class MarketScannerViewModel : ViewModel() {
         val normalized =
             MarketRefreshPolicy.normalizeInterval(intervalMs)
 
-        _uiState.value =
-            _uiState.value.copy(refreshIntervalMs = normalized)
+        _uiState.value = _uiState.value.copy(
+            refreshIntervalMs = normalized
+        )
 
         if (_uiState.value.autoRefreshEnabled) {
             startAutoRefresh()
@@ -207,8 +230,9 @@ class MarketScannerViewModel : ViewModel() {
         if (_uiState.value.autoRefreshEnabled) {
             stopAutoRefresh()
         } else {
-            _uiState.value =
-                _uiState.value.copy(autoRefreshEnabled = true)
+            _uiState.value = _uiState.value.copy(
+                autoRefreshEnabled = true
+            )
             startAutoRefresh()
             scanMarkets()
         }
@@ -232,8 +256,9 @@ class MarketScannerViewModel : ViewModel() {
         autoRefreshJob?.cancel()
         autoRefreshJob = null
 
-        _uiState.value =
-            _uiState.value.copy(autoRefreshEnabled = false)
+        _uiState.value = _uiState.value.copy(
+            autoRefreshEnabled = false
+        )
     }
 
     fun clearResults() {
@@ -254,8 +279,9 @@ class MarketScannerViewModel : ViewModel() {
         scanJob?.cancel()
         scanJob = null
 
-        _uiState.value =
-            _uiState.value.copy(isScanning = false)
+        _uiState.value = _uiState.value.copy(
+            isScanning = false
+        )
     }
 
     override fun onCleared() {
