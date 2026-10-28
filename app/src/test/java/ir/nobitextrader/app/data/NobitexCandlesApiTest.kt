@@ -1,71 +1,72 @@
 
 package ir.nobitextrader.app.data
 
-import ir.nobitextrader.app.strategy.Candle
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
-/**
- * Live integration test for Nobitex candle history.
- *
- * This test uses the real public API.
- * It does not submit orders or place trades.
- *
- * Network access is required. A passing compile does not
- * guarantee that the live API endpoint or response format is correct.
- */
 class NobitexCandlesApiTest {
 
     @Test
-    fun fetchCandles_returnsValidOrderedCandlesFromLiveApi() =
-        runBlocking {
-            val toSeconds = System.currentTimeMillis() / 1000L
-            val fromSeconds = toSeconds - 24L * 60L * 60L
-
-            val candles = NobitexCandlesApi.fetchCandles(
-                symbol = "BTCIRT",
-                resolution = "60",
-                fromUnixSeconds = fromSeconds,
-                toUnixSeconds = toSeconds
-            )
-
-            assertTrue(
-                "The live API returned no candles",
-                candles.isNotEmpty()
-            )
-
-            assertTrue(
-                "Candles must be ordered by timestamp",
-                candles.zipWithNext().all { (first, second) ->
-                    first.timestampMillis <= second.timestampMillis
-                }
-            )
-
-            candles.forEachIndexed { index, candle ->
-                assertTrue(
-                    "Invalid candle at index $index",
-                    candle.isValid()
-                )
-                assertTrue(
-                    "Candle timestamp must be positive",
-                    candle.timestampMillis > 0L
-                )
-                assertTrue(
-                    "Candle close must be positive",
-                    candle.close > 0.0
-                )
-                assertTrue(
-                    "Candle volume must not be negative",
-                    candle.volume >= 0.0
-                )
+    fun parsesValidCandlesAndSortsByTimestamp() {
+        val response = """
+            {
+              "s": "ok",
+              "t": [120, 60],
+              "o": [102, 100],
+              "h": [105, 103],
+              "l": [101, 99],
+              "c": [104, 102],
+              "v": [12, 10]
             }
+        """.trimIndent()
 
-            assertEquals(
-                candles.size,
-                candles.distinctBy { it.timestampMillis }.size
-            )
-        }
+        val candles = NobitexCandlesApi.parseResponse(response)
+
+        assertEquals(2, candles.size)
+        assertEquals(60_000L, candles[0].timestampMillis)
+        assertEquals(120_000L, candles[1].timestampMillis)
+        assertEquals(102.0, candles[0].close, 0.000001)
+    }
+
+    @Test
+    fun noDataReturnsEmptyList() {
+        val candles = NobitexCandlesApi.parseResponse(
+            """{"s":"no_data"}"""
+        )
+
+        assertTrue(candles.isEmpty())
+    }
+
+    @Test(expected = IOException::class)
+    fun invalidJsonThrowsIOException() {
+        NobitexCandlesApi.parseResponse(
+            "<html>Access denied</html>"
+        )
+    }
+
+    @Test(expected = IOException::class)
+    fun missingCandleArrayThrowsIOException() {
+        NobitexCandlesApi.parseResponse(
+            """{"s":"ok","t":[],"o":[],"h":[],"l":[],"c":[]}"""
+        )
+    }
+
+    @Test(expected = IOException::class)
+    fun mismatchedArrayLengthsThrowIOException() {
+        NobitexCandlesApi.parseResponse(
+            """
+            {
+              "s":"ok",
+              "t":[60,120],
+              "o":[100],
+              "h":[101,102],
+              "l":[99,100],
+              "c":[100,101],
+              "v":[1,2]
+            }
+            """.trimIndent()
+        )
+    }
 }
