@@ -3,6 +3,10 @@ package ir.nobitextrader.app.data
 
 object MarketStatsValidator {
 
+    fun isValid(stats: MarketStats): Boolean {
+        return validate(stats).isEmpty()
+    }
+
     fun validate(stats: MarketStats): List<String> {
         val errors = mutableListOf<String>()
 
