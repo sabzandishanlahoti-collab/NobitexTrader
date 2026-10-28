@@ -1,4 +1,3 @@
-
 package ir.nobitextrader.app
 
 import android.os.Bundle
@@ -28,11 +27,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import ir.nobitextrader.app.data.MarketStats
+import ir.nobitextrader.app.data.NobitexCandlesApi
 import ir.nobitextrader.app.data.NobitexMarketApi
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private enum class AppScreen {
     HOME,
@@ -54,20 +55,30 @@ class MainActivity : ComponentActivity() {
             }
 
             val scope = rememberCoroutineScope()
+            val english = settings.useEnglish
 
-            var result by remember {
+            var marketResult by remember {
                 mutableStateOf<MarketStats?>(null)
             }
-
-            var loading by remember {
+            var marketLoading by remember {
                 mutableStateOf(false)
             }
-
-            var error by remember {
+            var marketError by remember {
                 mutableStateOf<String?>(null)
             }
 
-            val english = settings.useEnglish
+            var candlesLoading by remember {
+                mutableStateOf(false)
+            }
+            var candleCount by remember {
+                mutableStateOf<Int?>(null)
+            }
+            var lastCandleTime by remember {
+                mutableStateOf<String?>(null)
+            }
+            var candleError by remember {
+                mutableStateOf<String?>(null)
+            }
 
             BackHandler(enabled = screen == AppScreen.SETTINGS) {
                 settings = TraderSettingsStore.load(this@MainActivity)
@@ -140,38 +151,35 @@ class MainActivity : ComponentActivity() {
 
                                 Button(
                                     modifier = Modifier.fillMaxWidth(),
-                                    enabled = !loading,
+                                    enabled = !marketLoading,
                                     onClick = {
                                         scope.launch {
-                                            loading = true
-                                            error = null
+                                            marketLoading = true
+                                            marketError = null
 
                                             try {
-                                                result = withContext(
-                                                    Dispatchers.IO
-                                                ) {
-                                                    NobitexMarketApi
-                                                        .fetchMarketStats()
-                                                }
+                                                marketResult =
+                                                    NobitexMarketApi.fetchMarketStats()
                                             } catch (e: Exception) {
-                                                error = e.message
-                                                    ?: if (english) {
-                                                        "Unknown market data error"
-                                                    } else {
-                                                        "خطای نامشخص در دریافت اطلاعات"
-                                                    }
+                                                marketError =
+                                                    e.message
+                                                        ?: if (english) {
+                                                            "Unknown market data error"
+                                                        } else {
+                                                            "خطای نامشخص دریافت اطلاعات بازار"
+                                                        }
                                             } finally {
-                                                loading = false
+                                                marketLoading = false
                                             }
                                         }
                                     }
                                 ) {
                                     Text(
                                         when {
-                                            loading && english ->
-                                                "Loading..."
-                                            loading ->
-                                                "در حال دریافت..."
+                                            marketLoading && english ->
+                                                "Loading market..."
+                                            marketLoading ->
+                                                "دریافت اطلاعات بازار..."
                                             english ->
                                                 "Fetch live BTC/IRT market data"
                                             else ->
@@ -180,22 +188,8 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
-                                if (loading) {
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    CircularProgressIndicator()
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        if (english) {
-                                            "Connecting to Nobitex..."
-                                        } else {
-                                            "در حال اتصال به نوبیتکس..."
-                                        }
-                                    )
-                                }
-
-                                result?.let { stats ->
-                                    Spacer(modifier = Modifier.height(16.dp))
-
+                                marketResult?.let { stats ->
+                                    Spacer(modifier = Modifier.height(12.dp))
                                     Text(
                                         if (english) "Market data received"
                                         else "دریافت اطلاعات بازار موفق بود"
@@ -207,10 +201,129 @@ class MainActivity : ComponentActivity() {
                                     Text("${if (english) "Daily change" else "تغییر روزانه"}: ${stats.dayChange}%")
                                 }
 
-                                error?.let { message ->
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                marketError?.let { message ->
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = message,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(24.dp))
+
+                                Button(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !candlesLoading,
+                                    onClick = {
+                                        scope.launch {
+                                            candlesLoading = true
+                                            candleError = null
+                                            candleCount = null
+                                            lastCandleTime = null
+
+                                            try {
+                                                val nowSeconds =
+                                                    System.currentTimeMillis() / 1000L
+
+                                                val candles =
+                                                    NobitexCandlesApi.fetchCandles(
+                                                        symbol = "BTCIRT",
+                                                        resolution = "60",
+                                                        fromUnixSeconds =
+                                                            nowSeconds - 24L * 60L * 60L,
+                                                        toUnixSeconds = nowSeconds
+                                                    )
+
+                                                candleCount = candles.size
+
+                                                lastCandleTime =
+                                                    candles.lastOrNull()?.let { candle ->
+                                                        SimpleDateFormat(
+                                                            "yyyy-MM-dd HH:mm:ss",
+                                                            Locale.getDefault()
+                                                        ).format(
+                                                            Date(candle.timestampMillis)
+                                                        )
+                                                    }
+                                            } catch (e: Exception) {
+                                                candleError =
+                                                    e.message
+                                                        ?: if (english) {
+                                                            "Unknown candle API error"
+                                                        } else {
+                                                            "خطای نامشخص دریافت کندل"
+                                                        }
+                                            } finally {
+                                                candlesLoading = false
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        when {
+                                            candlesLoading && english ->
+                                                "Fetching live candles..."
+                                            candlesLoading ->
+                                                "در حال دریافت کندل..."
+                                            english ->
+                                                "Test live BTC/IRT candles"
+                                            else ->
+                                                "آزمایش دریافت کندل واقعی BTC/IRT"
+                                        }
+                                    )
+                                }
+
+                                if (candlesLoading) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    CircularProgressIndicator()
+                                }
+
+                                candleCount?.let { count ->
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        if (english) {
+                                            "Candle request completed"
+                                        } else {
+                                            "درخواست کندل پایان یافت"
+                                        }
+                                    )
+                                    Text(
+                                        if (english) {
+                                            "Candles received: $count"
+                                        } else {
+                                            "تعداد کندل دریافتی: $count"
+                                        }
+                                    )
+
+                                    lastCandleTime?.let { time ->
+                                        Text(
+                                            if (english) {
+                                                "Latest candle time: $time"
+                                            } else {
+                                                "زمان آخرین کندل: $time"
+                                            }
+                                        )
+                                    }
+
+                                    if (count == 0) {
+                                        Text(
+                                            if (english) {
+                                                "The API returned no candles for this interval."
+                                            } else {
+                                                "API برای این بازه هیچ کندلی برنگرداند."
+                                            }
+                                        )
+                                    }
+                                }
+
+                                candleError?.let { message ->
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = if (english) {
+                                            "Candle request failed: $message"
+                                        } else {
+                                            "خطای دریافت کندل: $message"
+                                        },
                                         color = MaterialTheme.colorScheme.error
                                     )
                                 }
@@ -219,9 +332,9 @@ class MainActivity : ComponentActivity() {
 
                                 Text(
                                     text = if (english) {
-                                        "This test only reads public market data. It does not place orders."
+                                        "Read-only tests. No orders are placed."
                                     } else {
-                                        "این آزمایش فقط اطلاعات عمومی بازار را می‌خواند و سفارشی ثبت نمی‌کند."
+                                        "این آزمایش‌ها فقط اطلاعات بازار و کندل را می‌خوانند و سفارشی ثبت نمی‌کنند."
                                     },
                                     style = MaterialTheme.typography.bodySmall
                                 )
