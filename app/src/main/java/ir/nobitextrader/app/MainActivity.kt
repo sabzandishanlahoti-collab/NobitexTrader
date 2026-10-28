@@ -30,9 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import ir.nobitextrader.app.data.MarketStats
 import ir.nobitextrader.app.data.NobitexCandlesApi
 import ir.nobitextrader.app.data.NobitexMarketApi
+import ir.nobitextrader.app.scanner.MarketScannerScreen
+import ir.nobitextrader.app.scanner.MarketScannerViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,7 +43,8 @@ import java.util.Locale
 
 private enum class AppScreen {
     HOME,
-    SETTINGS
+    SETTINGS,
+    SCANNER
 }
 
 class MainActivity : ComponentActivity() {
@@ -52,8 +56,17 @@ class MainActivity : ComponentActivity() {
             var settings by remember {
                 mutableStateOf(TraderSettingsStore.load(this@MainActivity))
             }
+
             var screen by remember {
                 mutableStateOf(AppScreen.HOME)
+            }
+
+            // ViewModel is owned by this Activity and survives
+            // Compose recompositions and screen navigation.
+            val scannerViewModel = remember {
+                ViewModelProvider(this@MainActivity)[
+                    MarketScannerViewModel::class.java
+                ]
             }
 
             val scope = rememberCoroutineScope()
@@ -92,8 +105,12 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf<String?>(null)
             }
 
-            BackHandler(enabled = screen == AppScreen.SETTINGS) {
-                settings = TraderSettingsStore.load(this@MainActivity)
+            BackHandler(enabled = screen != AppScreen.HOME) {
+                if (screen == AppScreen.SETTINGS) {
+                    settings = TraderSettingsStore.load(
+                        this@MainActivity
+                    )
+                }
                 screen = AppScreen.HOME
             }
 
@@ -119,6 +136,38 @@ class MainActivity : ComponentActivity() {
                                     screen = AppScreen.HOME
                                 }
                             )
+                        }
+
+                        AppScreen.SCANNER -> {
+                            Column(
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Button(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            horizontal = 12.dp,
+                                            vertical = 6.dp
+                                        ),
+                                    onClick = {
+                                        screen = AppScreen.HOME
+                                    }
+                                ) {
+                                    Text(
+                                        if (english) {
+                                            "Back to home"
+                                        } else {
+                                            "بازگشت به صفحه اصلی"
+                                        }
+                                    )
+                                }
+
+                                MarketScannerScreen(
+                                    viewModel = scannerViewModel,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                )
+                            }
                         }
 
                         AppScreen.HOME -> {
@@ -160,6 +209,23 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Button(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = {
+                                        screen = AppScreen.SCANNER
+                                    }
+                                ) {
+                                    Text(
+                                        if (english) {
+                                            "Open market scanner"
+                                        } else {
+                                            "ورود به اسکن بازار نوبیتکس"
+                                        }
+                                    )
+                                }
+
                                 Spacer(modifier = Modifier.height(16.dp))
 
                                 Button(
@@ -172,7 +238,8 @@ class MainActivity : ComponentActivity() {
 
                                             try {
                                                 marketResult =
-                                                    NobitexMarketApi.fetchMarketStats()
+                                                    NobitexMarketApi
+                                                        .fetchMarketStats()
                                             } catch (e: Exception) {
                                                 marketError =
                                                     e.message
@@ -198,10 +265,15 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 marketResult?.let { stats ->
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Spacer(
+                                        modifier = Modifier.height(12.dp)
+                                    )
                                     Text(
-                                        if (english) "Market data received"
-                                        else "دریافت اطلاعات بازار موفق بود"
+                                        if (english) {
+                                            "Market data received"
+                                        } else {
+                                            "دریافت اطلاعات بازار موفق بود"
+                                        }
                                     )
                                     Text("Market: ${stats.market}")
                                     Text("Last price: ${stats.latest}")
@@ -211,7 +283,9 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 marketError?.let { message ->
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(
+                                        modifier = Modifier.height(8.dp)
+                                    )
                                     Text(
                                         text = message,
                                         color = MaterialTheme.colorScheme.error
@@ -258,10 +332,15 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 rawResponse?.let { response ->
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(
+                                        modifier = Modifier.height(8.dp)
+                                    )
                                     Text(
-                                        if (english) "Raw API response:"
-                                        else "پاسخ خام API:"
+                                        if (english) {
+                                            "Raw API response:"
+                                        } else {
+                                            "پاسخ خام API:"
+                                        }
                                     )
                                     Text(
                                         text = response,
@@ -271,7 +350,9 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 rawError?.let { message ->
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(
+                                        modifier = Modifier.height(8.dp)
+                                    )
                                     Text(
                                         text = message,
                                         color = MaterialTheme.colorScheme.error
@@ -292,26 +373,32 @@ class MainActivity : ComponentActivity() {
 
                                             try {
                                                 val nowSeconds =
-                                                    System.currentTimeMillis() / 1000L
+                                                    System.currentTimeMillis() /
+                                                        1000L
 
                                                 val candles =
                                                     NobitexCandlesApi.fetchCandles(
                                                         symbol = "BTCIRT",
                                                         resolution = "60",
                                                         fromUnixSeconds =
-                                                            nowSeconds - 24L * 60L * 60L,
-                                                        toUnixSeconds = nowSeconds
+                                                            nowSeconds -
+                                                                24L * 60L * 60L,
+                                                        toUnixSeconds =
+                                                            nowSeconds
                                                     )
 
                                                 candleCount = candles.size
 
                                                 lastCandleTime =
-                                                    candles.lastOrNull()?.let { candle ->
+                                                    candles.lastOrNull()?.let {
+                                                        candle ->
                                                         SimpleDateFormat(
                                                             "yyyy-MM-dd HH:mm:ss",
                                                             Locale.getDefault()
                                                         ).format(
-                                                            Date(candle.timestampMillis)
+                                                            Date(
+                                                                candle.timestampMillis
+                                                            )
                                                         )
                                                     }
                                             } catch (e: Exception) {
@@ -338,20 +425,34 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
-                                if (candlesLoading || rawLoading || marketLoading) {
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                if (
+                                    candlesLoading ||
+                                    rawLoading ||
+                                    marketLoading
+                                ) {
+                                    Spacer(
+                                        modifier = Modifier.height(12.dp)
+                                    )
                                     CircularProgressIndicator()
                                 }
 
                                 candleCount?.let { count ->
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        if (english) "Candle request completed"
-                                        else "درخواست کندل پایان یافت"
+                                    Spacer(
+                                        modifier = Modifier.height(12.dp)
                                     )
                                     Text(
-                                        if (english) "Candles received: $count"
-                                        else "تعداد کندل دریافتی: $count"
+                                        if (english) {
+                                            "Candle request completed"
+                                        } else {
+                                            "درخواست کندل پایان یافت"
+                                        }
+                                    )
+                                    Text(
+                                        if (english) {
+                                            "Candles received: $count"
+                                        } else {
+                                            "تعداد کندل دریافتی: $count"
+                                        }
                                     )
 
                                     lastCandleTime?.let { time ->
@@ -376,7 +477,9 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 candleError?.let { message ->
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Spacer(
+                                        modifier = Modifier.height(12.dp)
+                                    )
                                     Text(
                                         text = if (english) {
                                             "Candle request failed: $message"
