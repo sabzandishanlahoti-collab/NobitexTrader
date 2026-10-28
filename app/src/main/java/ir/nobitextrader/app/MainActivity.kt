@@ -1,3 +1,5 @@
+
+
 package ir.nobitextrader.app
 
 import android.os.Bundle
@@ -11,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -67,6 +71,16 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf<String?>(null)
             }
 
+            var rawLoading by remember {
+                mutableStateOf(false)
+            }
+            var rawResponse by remember {
+                mutableStateOf<String?>(null)
+            }
+            var rawError by remember {
+                mutableStateOf<String?>(null)
+            }
+
             var candlesLoading by remember {
                 mutableStateOf(false)
             }
@@ -113,6 +127,7 @@ class MainActivity : ComponentActivity() {
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .verticalScroll(rememberScrollState())
                                     .padding(24.dp),
                                 verticalArrangement = Arrangement.Center,
                                 horizontalAlignment = Alignment.CenterHorizontally
@@ -209,6 +224,76 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Button(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !rawLoading,
+                                    onClick = {
+                                        scope.launch {
+                                            rawLoading = true
+                                            rawResponse = null
+                                            rawError = null
+
+                                            try {
+                                                rawResponse =
+                                                    NobitexMarketApi
+                                                        .fetchRawMarketStatsResponse()
+                                            } catch (e: Exception) {
+                                                rawError =
+                                                    e.message
+                                                        ?: "Unknown raw API error"
+                                            } finally {
+                                                rawLoading = false
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        when {
+                                            rawLoading && english ->
+                                                "Fetching raw API response..."
+                                            rawLoading ->
+                                                "در حال دریافت پاسخ خام..."
+                                            english ->
+                                                "Show raw Nobitex API response"
+                                            else ->
+                                                "نمایش پاسخ خام نوبیتکس"
+                                        }
+                                    )
+                                }
+
+                                rawResponse?.let { response ->
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        if (english) {
+                                            "Raw API response:"
+                                        } else {
+                                            "پاسخ خام API:"
+                                        },
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+                                    Text(
+                                        text = response,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(4.dp),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+
+                                rawError?.let { message ->
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = if (english) {
+                                            "Raw API request failed: $message"
+                                        } else {
+                                            "خطای دریافت پاسخ خام: $message"
+                                        },
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+
                                 Spacer(modifier = Modifier.height(24.dp))
 
                                 Button(
@@ -224,6 +309,128 @@ class MainActivity : ComponentActivity() {
                                             try {
                                                 val nowSeconds =
                                                     System.currentTimeMillis() / 1000L
+
+                                                val candles =
+                                                    NobitexCandlesApi.fetchCandles(
+                                                        symbol = "BTCIRT",
+                                                        resolution = "60",
+                                                        fromUnixSeconds =
+                                                            nowSeconds - 24L * 60L * 60L,
+                                                        toUnixSeconds = nowSeconds
+                                                    )
+
+                                                candleCount = candles.size
+
+                                                lastCandleTime =
+                                                    candles.lastOrNull()?.let { candle ->
+                                                        SimpleDateFormat(
+                                                            "yyyy-MM-dd HH:mm:ss",
+                                                            Locale.getDefault()
+                                                        ).format(
+                                                            Date(candle.timestampMillis)
+                                                        )
+                                                    }
+                                            } catch (e: Exception) {
+                                                candleError =
+                                                    e.message
+                                                        ?: if (english) {
+                                                            "Unknown candle API error"
+                                                        } else {
+                                                            "خطای نامشخص دریافت کندل"
+                                                        }
+                                            } finally {
+                                                candlesLoading = false
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        when {
+                                            candlesLoading && english ->
+                                                "Fetching live candles..."
+                                            candlesLoading ->
+                                                "در حال دریافت کندل..."
+                                            english ->
+                                                "Test live BTC/IRT candles"
+                                            else ->
+                                                "آزمایش دریافت کندل واقعی BTC/IRT"
+                                        }
+                                    )
+                                }
+
+                                if (candlesLoading || rawLoading) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    CircularProgressIndicator()
+                                }
+
+                                candleCount?.let { count ->
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        if (english) {
+                                            "Candle request completed"
+                                        } else {
+                                            "درخواست کندل پایان یافت"
+                                        }
+                                    )
+                                    Text(
+                                        if (english) {
+                                            "Candles received: $count"
+                                        } else {
+                                            "تعداد کندل دریافتی: $count"
+                                        }
+                                    )
+
+                                    lastCandleTime?.let { time ->
+                                        Text(
+                                            if (english) {
+                                                "Latest candle time: $time"
+                                            } else {
+                                                "زمان آخرین کندل: $time"
+                                            }
+                                        )
+                                    }
+
+                                    if (count == 0) {
+                                        Text(
+                                            if (english) {
+                                                "The API returned no candles for this interval."
+                                            } else {
+                                                "API برای این بازه هیچ کندلی برنگرداند."
+                                            }
+                                        )
+                                    }
+                                }
+
+                                candleError?.let { message ->
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = if (english) {
+                                            "Candle request failed: $message"
+                                        } else {
+                                            "خطای دریافت کندل: $message"
+                                        },
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(20.dp))
+
+                                Text(
+                                    text = if (english) {
+                                        "Read-only tests. No orders are placed."
+                                    } else {
+                                        "این آزمایش‌ها فقط اطلاعات بازار و کندل را می‌خوانند و سفارشی ثبت نمی‌کنند."
+                                    },
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
                                                 val candles =
                                                     NobitexCandlesApi.fetchCandles(
