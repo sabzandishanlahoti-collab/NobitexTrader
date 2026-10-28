@@ -1,8 +1,8 @@
-
 package ir.nobitextrader.app.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import java.io.IOException
 
@@ -13,60 +13,90 @@ class NobitexCandlesApiTest {
         val response = """
             {
               "s": "ok",
-              "t": [120, 60],
-              "o": [102, 100],
-              "h": [105, 103],
-              "l": [101, 99],
-              "c": [104, 102],
-              "v": [12, 10]
+              "t": [1720003600, 1720000000],
+              "o": [61000, 60000],
+              "h": [62000, 61000],
+              "l": [60500, 59500],
+              "c": [61500, 60500],
+              "v": [12.5, 10.0]
             }
         """.trimIndent()
 
         val candles = NobitexCandlesApi.parseResponse(response)
 
         assertEquals(2, candles.size)
-        assertEquals(60_000L, candles[0].timestampMillis)
-        assertEquals(120_000L, candles[1].timestampMillis)
-        assertEquals(102.0, candles[0].close, 0.000001)
+        assertTrue(
+            "Candles must be ordered by timestamp",
+            candles[0].timestampMillis < candles[1].timestampMillis
+        )
+
+        assertEquals(1720000000000L, candles[0].timestampMillis)
+        assertEquals(60000.0, candles[0].open, 0.0)
+        assertEquals(61000.0, candles[0].high, 0.0)
+        assertEquals(59500.0, candles[0].low, 0.0)
+        assertEquals(60500.0, candles[0].close, 0.0)
+        assertEquals(10.0, candles[0].volume, 0.0)
     }
 
     @Test
     fun noDataReturnsEmptyList() {
-        val candles = NobitexCandlesApi.parseResponse(
-            """{"s":"no_data"}"""
-        )
+        val response = """{"s":"no_data"}"""
+
+        val candles = NobitexCandlesApi.parseResponse(response)
 
         assertTrue(candles.isEmpty())
     }
 
-    @Test(expected = IOException::class)
+    @Test
     fun invalidJsonThrowsIOException() {
-        NobitexCandlesApi.parseResponse(
-            "<html>Access denied</html>"
-        )
+        assertIOException {
+            NobitexCandlesApi.parseResponse("not valid json")
+        }
     }
 
-    @Test(expected = IOException::class)
+    @Test
     fun missingCandleArrayThrowsIOException() {
-        NobitexCandlesApi.parseResponse(
-            """{"s":"ok","t":[],"o":[],"h":[],"l":[],"c":[]}"""
-        )
+        val response = """
+            {
+              "s": "ok",
+              "t": [1720000000],
+              "o": [60000],
+              "h": [61000],
+              "l": [59000],
+              "c": [60500]
+            }
+        """.trimIndent()
+
+        assertIOException {
+            NobitexCandlesApi.parseResponse(response)
+        }
     }
 
-    @Test(expected = IOException::class)
+    @Test
     fun mismatchedArrayLengthsThrowIOException() {
-        NobitexCandlesApi.parseResponse(
-            """
+        val response = """
             {
-              "s":"ok",
-              "t":[60,120],
-              "o":[100],
-              "h":[101,102],
-              "l":[99,100],
-              "c":[100,101],
-              "v":[1,2]
+              "s": "ok",
+              "t": [1720000000, 1720003600],
+              "o": [60000],
+              "h": [61000, 62000],
+              "l": [59000, 60000],
+              "c": [60500, 61500],
+              "v": [10.0, 12.0]
             }
-            """.trimIndent()
-        )
+        """.trimIndent()
+
+        assertIOException {
+            NobitexCandlesApi.parseResponse(response)
+        }
+    }
+
+    private fun assertIOException(block: () -> Unit) {
+        try {
+            block()
+            fail("Expected IOException, but no exception was thrown")
+        } catch (_: IOException) {
+            // Expected result.
+        }
     }
 }
