@@ -64,8 +64,9 @@ object MarketScanner {
             } catch (e: Exception) {
                 results.add(
                     failedResult(
-                        symbol,
-                        e.message ?: "خطای دریافت اطلاعات بازار"
+                        symbol = symbol,
+                        message = e.message
+                            ?: "خطای دریافت اطلاعات بازار"
                     )
                 )
             } finally {
@@ -82,7 +83,9 @@ object MarketScanner {
         onProgress: ((completed: Int, total: Int) -> Unit)? = null
     ): List<MarketScanResult> {
         val snapshots = NobitexOrderBookApi.fetchAll(
-            timeoutMillis = policy.requestTimeoutMillis
+            timeoutMillis = policy.requestTimeoutMillis,
+            maxMarkets = policy.maxMarketsPerBatch,
+            onProgress = onProgress
         )
 
         val validSnapshots = snapshots
@@ -90,25 +93,17 @@ object MarketScanner {
             .distinctBy { it.symbol }
             .take(policy.maxMarketsPerBatch)
 
-        val total = validSnapshots.size
-        val results = mutableListOf<MarketScanResult>()
-
-        onProgress?.invoke(0, total)
-
-        validSnapshots.forEachIndexed { index, snapshot ->
+        val results = validSnapshots.map { snapshot ->
             try {
-                results.add(toScanResult(snapshot))
+                toScanResult(snapshot)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                results.add(
-                    failedResult(
-                        snapshot.symbol,
-                        e.message ?: "خطای پردازش دفتر سفارش"
-                    )
+                failedResult(
+                    symbol = snapshot.symbol,
+                    message = e.message
+                        ?: "خطای پردازش دفتر سفارش"
                 )
-            } finally {
-                onProgress?.invoke(index + 1, total)
             }
         }
 
@@ -131,10 +126,14 @@ object MarketScanner {
                 successful.sortedBy { it.spreadPercent }
 
             MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW ->
-                successful.sortedByDescending { it.bidLiquidityTop5 }
+                successful.sortedByDescending {
+                    it.bidLiquidityTop5
+                }
 
             MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW ->
-                successful.sortedByDescending { it.askLiquidityTop5 }
+                successful.sortedByDescending {
+                    it.askLiquidityTop5
+                }
 
             MarketSortMode.BALANCED_PRIORITY ->
                 sortByBalancedPriority(successful)
@@ -159,7 +158,8 @@ object MarketScanner {
             max: Double
         ): Double {
             if (max <= min) return 1.0
-            return ((max - value) / (max - min)).coerceIn(0.0, 1.0)
+            return ((max - value) / (max - min))
+                .coerceIn(0.0, 1.0)
         }
 
         fun normalizedHigherIsBetter(
@@ -191,10 +191,10 @@ object MarketScanner {
         }
     }
 
-    fun successfulCount(results: List<MarketScanResult>) =
+    fun successfulCount(results: List<MarketScanResult>): Int =
         results.count { it.success }
 
-    fun failedCount(results: List<MarketScanResult>) =
+    fun failedCount(results: List<MarketScanResult>): Int =
         results.count { !it.success }
 
     private fun failedResult(
