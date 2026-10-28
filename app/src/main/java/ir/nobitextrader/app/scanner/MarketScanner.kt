@@ -78,6 +78,11 @@ object MarketScanner {
         return results
     }
 
+    /**
+     * Scans every valid order book returned by the exchange's all endpoint.
+     * maxMarketsPerBatch is retained for compatibility with the policy,
+     * but does not cap the total results of scanAll().
+     */
     suspend fun scanAll(
         policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT,
         onProgress: ((completed: Int, total: Int) -> Unit)? = null
@@ -91,19 +96,29 @@ object MarketScanner {
         val validSnapshots = snapshots
             .filter { it.symbol.matches(symbolPattern) }
             .distinctBy { it.symbol }
-            .take(policy.maxMarketsPerBatch)
 
-        val results = validSnapshots.map { snapshot ->
+        val total = validSnapshots.size
+        var completed = 0
+        val results = mutableListOf<MarketScanResult>()
+
+        onProgress?.invoke(0, total)
+
+        for (snapshot in validSnapshots) {
             try {
-                toScanResult(snapshot)
+                results.add(toScanResult(snapshot))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                failedResult(
-                    symbol = snapshot.symbol,
-                    message = e.message
-                        ?: "خطای پردازش دفتر سفارش"
+                results.add(
+                    failedResult(
+                        symbol = snapshot.symbol,
+                        message = e.message
+                            ?: "خطای پردازش دفتر سفارش"
+                    )
                 )
+            } finally {
+                completed++
+                onProgress?.invoke(completed, total)
             }
         }
 
