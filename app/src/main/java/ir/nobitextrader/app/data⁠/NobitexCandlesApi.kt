@@ -12,16 +12,15 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Read-only client for Nobitex candle history.
- * Does not submit orders.
+ * Read-only Nobitex candle client.
+ * Never places orders.
  */
 object NobitexCandlesApi {
 
     private const val BASE_URL =
         "https://apiv2.nobitex.ir/market/udf/history"
 
-    private const val CONNECTION_TIMEOUT_MS = 10_000
-    private const val READ_TIMEOUT_MS = 10_000
+    private const val TIMEOUT_MS = 10_000
 
     suspend fun fetchCandles(
         symbol: String,
@@ -30,55 +29,34 @@ object NobitexCandlesApi {
         toUnixSeconds: Long
     ): List<Candle> = withContext(Dispatchers.IO) {
 
-        require(symbol.isNotBlank()) {
-            "Market symbol must not be blank"
-        }
-        require(resolution.isNotBlank()) {
-            "Resolution must not be blank"
-        }
-        require(fromUnixSeconds >= 0L) {
-            "Start time must not be negative"
-        }
+        require(symbol.isNotBlank()) { "Symbol must not be blank" }
+        require(resolution.isNotBlank()) { "Resolution must not be blank" }
+        require(fromUnixSeconds >= 0L) { "Invalid start time" }
         require(toUnixSeconds > fromUnixSeconds) {
             "End time must be greater than start time"
         }
 
-        val encodedSymbol = URLEncoder.encode(
-            symbol,
-            Charsets.UTF_8.name()
-        )
-        val encodedResolution = URLEncoder.encode(
-            resolution,
-            Charsets.UTF_8.name()
-        )
-
         val url = URL(
-            "$BASE_URL?symbol=$encodedSymbol" +
-                "&resolution=$encodedResolution" +
+            "$BASE_URL?symbol=${encode(symbol)}" +
+                "&resolution=${encode(resolution)}" +
                 "&from=$fromUnixSeconds" +
                 "&to=$toUnixSeconds"
         )
 
-        var connection: HttpURLConnection? = null
+        val connection = url.openConnection() as HttpURLConnection
 
         try {
-            connection = (url.openConnection()
-                as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = CONNECTION_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty(
-                    "User-Agent",
-                    "TraderBot/NobitexTrader"
-                )
-            }
+            connection.requestMethod = "GET"
+            connection.connectTimeout = TIMEOUT_MS
+            connection.readTimeout = TIMEOUT_MS
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty(
+                "User-Agent",
+                "NobitexTrader/1.0"
+            )
 
-            val statusCode = connection.responseCode
-            val contentType =
-                connection.getHeaderField("Content-Type") ?: "unknown"
-
-            val stream = if (statusCode in 200..299) {
+            val status = connection.responseCode
+            val stream = if (status in 200..299) {
                 connection.inputStream
             } else {
                 connection.errorStream
@@ -88,129 +66,112 @@ object NobitexCandlesApi {
                 ?.use { it.readText() }
                 .orEmpty()
 
-            if (statusCode !in 200..299) {
+            if (status !in 200..299) {
                 throw IOException(
-                    "Nobitex candle request failed: HTTP $statusCode; " +
-                        "content-type=$contentType; " +
-                        "body=${body.take(300)}"
+                    "Nobitex HTTP $status; response=${body.take(250)}"
                 )
             }
 
-            val root = try {
-                JSONObject(body)
-            } catch (e: Exception) {
-                throw IOException(
-                    "Nobitex returned invalid candle JSON; " +
-                        "content-type=$contentType; " +
-                        "body=${body.take(300)}",
-                    e
-                )
-            }
-
-            when (root.optString("s")) {
-                "no_data" -> return@withContext emptyList<Candle>()
-
-                "error" -> throw IOException(
-                    "Nobitex candle API error: " +
-                        root.optString(
-                            "errmsg",
-                            "No error message supplied"
-                        )
-                )
-
-                "ok" -> Unit
-
-                else -> throw IOException(
-                    "Unexpected Nobitex candle response status: " +
-                        root.optString("s", "missing")
-                )
-            }
-
-            val times = requiredArray(root, "t")
-            val opens = requiredArray(root, "o")
-            val highs = requiredArray(root, "h")
-            val lows = requiredArray(root, "l")
-            val closes = requiredArray(root, "c")
-            val volumes = requiredArray(root, "v")
-
-            val count = times.length()
-
-            if (
-                opens.length() != count ||
-                highs.length() != count ||
-                lows.length() != count ||
-                closes.length() != count ||
-                volumes.length() != count
-            ) {
-                throw IOException(
-                    "Candle response arrays have different lengths"
-                )
-            }
-
-            val candles = ArrayList<Candle>(count)
-
-            for (index in 0 until count) {
-                val timestampSeconds = try {
-                    times.getLong(index)
-                } catch (e: Exception) {
-                    throw IOException(
-                        "Invalid candle timestamp at index $index",
-                        e
-                    )
-                }
-
-                if (
-                    timestampSeconds <= 0L ||
-                    timestampSeconds > Long.MAX_VALUE / 1000L
-                ) {
-                    throw IOException(
-                        "Invalid candle timestamp at index $index"
-                    )
-                }
-
-                val candle = Candle(
-                    timestampMillis = timestampSeconds * 1000L,
-                    open = numberAt(opens, index, "o"),
-                    high = numberAt(highs, index, "h"),
-                    low = numberAt(lows, index, "l"),
-                    close = numberAt(closes, index, "c"),
-                    volume = numberAt(volumes, index, "v")
-                )
-
-                if (!candle.isValid()) {
-                    throw IOException(
-                        "Invalid candle at response index $index"
-                    )
-                }
-
-                candles.add(candle)
-            }
-
-            candles.sortedBy { it.timestampMillis }
+            parseResponse(body)
         } catch (e: IOException) {
             throw e
         } catch (e: Exception) {
             throw IOException(
-                "Unable to fetch Nobitex candle history: " +
+                "Nobitex candle request failed: " +
                     (e.message ?: e.javaClass.simpleName),
                 e
             )
         } finally {
-            connection?.disconnect()
+            connection.disconnect()
         }
+    }
+
+    internal fun parseResponse(body: String): List<Candle> {
+        if (body.isBlank()) {
+            throw IOException("Nobitex returned an empty response")
+        }
+
+        val root = try {
+            JSONObject(body)
+        } catch (e: Exception) {
+            throw IOException(
+                "Nobitex response is not valid JSON: ${body.take(200)}",
+                e
+            )
+        }
+
+        when (root.optString("s")) {
+            "no_data" -> return emptyList()
+            "ok" -> Unit
+            "error" -> throw IOException(
+                "Nobitex candle API error: " +
+                    root.optString("errmsg", "No details provided")
+            )
+            else -> throw IOException(
+                "Unexpected candle response status: " +
+                    root.optString("s", "missing")
+            )
+        }
+
+        val times = requiredArray(root, "t")
+        val opens = requiredArray(root, "o")
+        val highs = requiredArray(root, "h")
+        val lows = requiredArray(root, "l")
+        val closes = requiredArray(root, "c")
+        val volumes = requiredArray(root, "v")
+
+        val count = times.length()
+
+        if (
+            opens.length() != count ||
+            highs.length() != count ||
+            lows.length() != count ||
+            closes.length() != count ||
+            volumes.length() != count
+        ) {
+            throw IOException("Candle arrays have inconsistent lengths")
+        }
+
+        val result = ArrayList<Candle>(count)
+
+        for (i in 0 until count) {
+            val seconds = try {
+                times.getLong(i)
+            } catch (e: Exception) {
+                throw IOException("Invalid timestamp at index $i", e)
+            }
+
+            if (seconds <= 0L || seconds > Long.MAX_VALUE / 1000L) {
+                throw IOException("Out-of-range timestamp at index $i")
+            }
+
+            val candle = Candle(
+                timestampMillis = seconds * 1000L,
+                open = readNumber(opens, i, "o"),
+                high = readNumber(highs, i, "h"),
+                low = readNumber(lows, i, "l"),
+                close = readNumber(closes, i, "c"),
+                volume = readNumber(volumes, i, "v")
+            )
+
+            if (!candle.isValid()) {
+                throw IOException("Invalid OHLCV candle at index $i")
+            }
+
+            result += candle
+        }
+
+        return result.sortedBy { it.timestampMillis }
     }
 
     private fun requiredArray(
         root: JSONObject,
         key: String
-    ): JSONArray {
-        return root.optJSONArray(key)
-            ?: throw IOException(
-                "Candle response is missing array '$key'"
-            )
-    }
+    ): JSONArray =
+        root.optJSONArray(key)
+            ?: throw IOException("Missing candle array '$key'")
 
-    private fun numberAt(
+    private fun readNumber(
         array: JSONArray,
         index: Int,
         field: String
@@ -219,17 +180,20 @@ object NobitexCandlesApi {
             array.getDouble(index)
         } catch (e: Exception) {
             throw IOException(
-                "Candle field '$field' is not numeric at index $index",
+                "Invalid numeric field '$field' at index $index",
                 e
             )
         }
 
         if (!value.isFinite()) {
             throw IOException(
-                "Candle field '$field' is not finite at index $index"
+                "Non-finite field '$field' at index $index"
             )
         }
 
         return value
     }
+
+    private fun encode(value: String): String =
+        URLEncoder.encode(value, Charsets.UTF_8.name())
 }
