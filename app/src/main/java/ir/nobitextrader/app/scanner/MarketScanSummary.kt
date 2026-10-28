@@ -17,28 +17,20 @@ data class MarketScanSummary(
         ): MarketScanSummary {
             val successful = results.filter { it.success }
 
-            val spreads = successful.mapNotNull { result ->
-                result.spreadPercent?.takeIf { value ->
-                    value.isFinite() && value >= 0.0
-                }
+            val validSpreads = successful.mapNotNull { result ->
+                result.spreadPercent
+                    ?.takeIf { it.isFinite() && it >= 0.0 }
+                    ?.let { spread -> result to spread }
             }
 
-            val bestSpread = successful
-                .mapNotNull { result ->
-                    val spread = result.spreadPercent
-                    if (spread != null && spread.isFinite() && spread >= 0.0) {
-                        result to spread
-                    } else {
-                        null
-                    }
-                }
-                .minByOrNull { (_, spread) -> spread }
+            val bestSpread = validSpreads.minByOrNull { it.second }
 
             return MarketScanSummary(
                 totalMarkets = results.size,
                 successfulMarkets = successful.size,
                 failedMarkets = results.count { !it.success },
-                averageSpreadPercent = spreads
+                averageSpreadPercent = validSpreads
+                    .map { it.second }
                     .takeIf { it.isNotEmpty() }
                     ?.average(),
                 bestSpreadSymbol = bestSpread?.first?.symbol,
