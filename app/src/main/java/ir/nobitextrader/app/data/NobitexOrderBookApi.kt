@@ -73,10 +73,13 @@ object NobitexOrderBookApi {
     }
 
     /**
-     * Downloads the exchange's all-order-books response and parses at most
-     * [maxMarkets] valid market entries. The endpoint response itself may
-     * contain more markets; this limit controls parsing and returned results,
-     * not the number of markets sent by the server.
+     * Parses every valid market present in the response from the all endpoint.
+     *
+     * maxMarkets is retained for source compatibility with existing callers.
+     * It is validated but does not limit the total number of returned markets.
+     *
+     * The result includes only markets with valid order-book data.
+     * Malformed market entries are skipped rather than fabricated.
      */
     @Throws(IOException::class)
     fun fetchAll(
@@ -98,32 +101,30 @@ object NobitexOrderBookApi {
         val keys = root.keys()
 
         while (keys.hasNext()) {
-            val symbol = keys.next()
-                .uppercase(Locale.ROOT)
+            val originalKey = keys.next()
+            val symbol = originalKey.uppercase(Locale.ROOT)
 
             if (!symbol.matches(symbolPattern)) continue
 
-            val market = root.optJSONObject(symbol)
+            val market = root.optJSONObject(originalKey)
+                ?: root.optJSONObject(symbol)
                 ?: root.optJSONObject(symbol.lowercase(Locale.ROOT))
                 ?: continue
 
             entries.add(symbol to market)
         }
 
-        val selectedEntries = entries
-            .distinctBy { it.first }
-            .take(maxMarkets)
-
-        val total = selectedEntries.size
+        val uniqueEntries = entries.distinctBy { it.first }
+        val total = uniqueEntries.size
         val markets = mutableListOf<OrderBookSnapshot>()
 
         onProgress?.invoke(0, total)
 
-        selectedEntries.forEachIndexed { index, (symbol, market) ->
+        uniqueEntries.forEachIndexed { index, (symbol, market) ->
             try {
                 markets.add(parseSnapshot(symbol, market))
             } catch (_: IOException) {
-                // Skip malformed market data without fabricating results.
+                // Ignore malformed entries and continue processing other markets.
             } finally {
                 onProgress?.invoke(index + 1, total)
             }
@@ -131,7 +132,7 @@ object NobitexOrderBookApi {
 
         if (markets.isEmpty()) {
             throw IOException(
-                "Nobitex returned no valid order books within the selected batch"
+                "Nobitex returned no valid order books"
             )
         }
 
