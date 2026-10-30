@@ -99,7 +99,6 @@ class NobitexCandlesApiTest {
             // Expected result.
         }
     }
-}
 
     @Test
     fun apiErrorStatusThrowsIOException() {
