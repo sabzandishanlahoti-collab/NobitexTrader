@@ -206,3 +206,67 @@ class MarketScannerViewModelAnalysisTest {
         }
     }
 }
+
+
+class CandleAnalysisWindowBoundaryTest {
+
+    @Test
+    fun windowEndsAtOpeningTimeOfLastFullyClosedCandle() {
+        val intervalSeconds = 900L
+        val nowSeconds = 1_700_000_123L
+        val window = CandleAnalysisWindow.forNow(
+            nowMillis = nowSeconds * 1_000L,
+            intervalSeconds = intervalSeconds,
+            lookbackHours = 48L
+        )
+        val currentCandleOpen = nowSeconds - (nowSeconds % intervalSeconds)
+        assertEquals(currentCandleOpen - intervalSeconds, window.toUnixSeconds)
+        assertTrue(window.toUnixSeconds < nowSeconds)
+        assertEquals(0L, window.toUnixSeconds % intervalSeconds)
+    }
+
+    @Test
+    fun windowHasExactlyConfiguredLookbackDuration() {
+        val window = CandleAnalysisWindow.forNow(
+            nowMillis = 1_700_000_123_000L,
+            intervalSeconds = 900L,
+            lookbackHours = 48L
+        )
+        assertEquals(48L * 3_600L, window.toUnixSeconds - window.fromUnixSeconds)
+    }
+
+    @Test
+    fun exactCandleBoundaryExcludesCurrentlyOpeningCandle() {
+        val intervalSeconds = 900L
+        val nowSeconds = 1_700_000_100L
+        val exactBoundary = nowSeconds - (nowSeconds % intervalSeconds)
+        val window = CandleAnalysisWindow.forNow(
+            nowMillis = exactBoundary * 1_000L,
+            intervalSeconds = intervalSeconds,
+            lookbackHours = 48L
+        )
+        assertEquals(exactBoundary - intervalSeconds, window.toUnixSeconds)
+    }
+
+    @Test
+    fun rejectsNonPositiveWindowParameters() {
+        assertIllegalArgument {
+            CandleAnalysisWindow.forNow(1_700_000_000_000L, 0L, 48L)
+        }
+        assertIllegalArgument {
+            CandleAnalysisWindow.forNow(1_700_000_000_000L, 900L, 0L)
+        }
+        assertIllegalArgument {
+            CandleAnalysisWindow.forNow(0L, 900L, 48L)
+        }
+    }
+
+    private fun assertIllegalArgument(block: () -> Unit) {
+        try {
+            block()
+            throw AssertionError("Expected IllegalArgumentException")
+        } catch (_: IllegalArgumentException) {
+            // Expected validation failure.
+        }
+    }
+}
