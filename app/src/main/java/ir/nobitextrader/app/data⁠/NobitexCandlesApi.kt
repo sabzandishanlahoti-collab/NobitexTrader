@@ -2,6 +2,7 @@
 package ir.nobitextrader.app.data
 
 import ir.nobitextrader.app.strategy.Candle
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -73,6 +74,8 @@ object NobitexCandlesApi {
             }
 
             parseResponse(body)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: IOException) {
             throw e
         } catch (e: Exception) {
