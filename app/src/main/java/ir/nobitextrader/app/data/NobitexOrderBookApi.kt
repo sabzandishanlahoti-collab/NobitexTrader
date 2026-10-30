@@ -206,7 +206,7 @@ object NobitexOrderBookApi {
         return normalized
     }
 
-    private fun parseSnapshot(
+    internal fun parseSnapshot(
         symbol: String,
         root: JSONObject
     ): OrderBookSnapshot {
