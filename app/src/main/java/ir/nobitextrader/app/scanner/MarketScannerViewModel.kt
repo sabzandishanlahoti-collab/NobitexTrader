@@ -141,6 +141,7 @@ class MarketScannerViewModel(
                             if (generation == scanGeneration) {
                                 streamedResults.add(result)
                                 val snapshot = streamedResults.toList()
+                                allResults = snapshot
                                 val current = _uiState.value
 
                                 _uiState.value = current.copy(
