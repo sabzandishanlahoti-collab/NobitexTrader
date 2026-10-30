@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 
 data class StrategyAnalysisUiState(
     val isLoading: Boolean = false,
@@ -344,7 +345,11 @@ class MarketScannerViewModel(
                         ))
                 )
             } finally {
-                analysisJobs.remove(normalizedSymbol)
+                // A cancelled older request must not remove a newer request
+                // registered for the same symbol after clearResults().
+                if (analysisJobs[normalizedSymbol] === coroutineContext[Job]) {
+                    analysisJobs.remove(normalizedSymbol)
+                }
             }
         }
     }
