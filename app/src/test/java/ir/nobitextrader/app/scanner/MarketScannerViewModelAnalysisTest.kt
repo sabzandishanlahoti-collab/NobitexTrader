@@ -150,6 +150,38 @@ class MarketScannerViewModelAnalysisTest {
     }
 
     @Test
+    fun cancelledOldRequestCannotRemoveNewRequestForSameSymbol() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            var loaderCalls = 0
+            val coordinator = StrategyAnalysisCoordinator(
+                candleLoader = { _, _, _, _ ->
+                    loaderCalls++
+                    awaitCancellation()
+                }
+            )
+            val viewModel = MarketScannerViewModel(coordinator)
+
+            viewModel.analyzeMarket("BTCIRT")
+            runCurrent()
+            assertEquals(1, loaderCalls)
+
+            viewModel.clearResults()
+            viewModel.analyzeMarket("BTCIRT")
+            runCurrent()
+            assertEquals(2, loaderCalls)
+
+            // The cancelled request's finally block must not unregister
+            // the newer active request for the same normalized symbol.
+            viewModel.analyzeMarket(" btcirt ")
+            runCurrent()
+            assertEquals(2, loaderCalls)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun differentSymbolsCanBeAnalyzedIndependently() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
