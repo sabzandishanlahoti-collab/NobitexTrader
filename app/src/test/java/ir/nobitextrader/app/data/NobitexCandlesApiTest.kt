@@ -100,3 +100,73 @@ class NobitexCandlesApiTest {
         }
     }
 }
+
+    @Test
+    fun apiErrorStatusThrowsIOException() {
+        val response = """{"s":"error","errmsg":"Invalid symbol"}"""
+
+        try {
+            NobitexCandlesApi.parseResponse(response)
+            fail("Expected IOException for API error status")
+        } catch (exception: IOException) {
+            assertTrue(exception.message.orEmpty().contains("Invalid symbol"))
+        }
+    }
+
+    @Test
+    fun nonPositiveTimestampThrowsIOException() {
+        val response = """
+            {
+              "s": "ok",
+              "t": [0],
+              "o": [60000],
+              "h": [61000],
+              "l": [59000],
+              "c": [60500],
+              "v": [10.0]
+            }
+        """.trimIndent()
+
+        assertIOException {
+            NobitexCandlesApi.parseResponse(response)
+        }
+    }
+
+    @Test
+    fun invalidOhlcRelationshipThrowsIOException() {
+        val response = """
+            {
+              "s": "ok",
+              "t": [1720000000],
+              "o": [60000],
+              "h": [59000],
+              "l": [59500],
+              "c": [60500],
+              "v": [10.0]
+            }
+        """.trimIndent()
+
+        assertIOException {
+            NobitexCandlesApi.parseResponse(response)
+        }
+    }
+
+    @Test
+    fun negativeVolumeThrowsIOException() {
+        val response = """
+            {
+              "s": "ok",
+              "t": [1720000000],
+              "o": [60000],
+              "h": [61000],
+              "l": [59000],
+              "c": [60500],
+              "v": [-1.0]
+            }
+        """.trimIndent()
+
+        assertIOException {
+            NobitexCandlesApi.parseResponse(response)
+        }
+    }
+}
