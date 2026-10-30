@@ -106,4 +106,27 @@ class BacktestEngineTest {
         assertEquals(ExitReason.END_OF_DATA, result.trades.single().exitReason)
     }
 
+
+    @Test
+    fun signalCallbackCannotMutateOriginalCandleHistory() {
+        val candles = mutableListOf(
+            c(1, 100.0, 101.0, 99.0, 100.0),
+            c(2, 100.0, 111.0, 99.0, 105.0),
+            c(3, 105.0, 106.0, 104.0, 105.0)
+        )
+        val result = BacktestEngine().run(candles, BacktestConfig(
+            initialCapital = 10_000.0, positionNotional = 1_000.0,
+            feeRate = 0.0, slippageRate = 0.0
+        )) { history ->
+            if (history.size == 1) {
+                (history as MutableList<Candle>)[0] = c(1, 700.0, 701.0, 699.0, 700.0)
+                BacktestSignal(TradeDirection.LONG, 95.0, 110.0)
+            } else null
+        }
+
+        assertEquals(100.0, candles.first().close, 0.000001)
+        assertEquals(100.0, result.trades.single().entryPrice, 0.000001)
+        assertEquals(ExitReason.TAKE_PROFIT, result.trades.single().exitReason)
+    }
+
 }
