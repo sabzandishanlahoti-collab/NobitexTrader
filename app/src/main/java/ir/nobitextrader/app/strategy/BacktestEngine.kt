@@ -99,9 +99,31 @@ class BacktestEngine {
                 }
             }
 
+            // Mark open positions at the adverse intrabar extreme so temporary
+            // unrealized losses are included in maximum drawdown.
+            val markedEquity = position?.let { p ->
+                val adverseRawPrice = when (p.direction) {
+                    TradeDirection.LONG -> candle.low
+                    TradeDirection.SHORT -> candle.high
+                    TradeDirection.FLAT -> p.entryPrice
+                }
+                val adverseExitPrice = adverseRawPrice * when (p.direction) {
+                    TradeDirection.LONG -> 1.0 - config.slippageRate
+                    TradeDirection.SHORT -> 1.0 + config.slippageRate
+                    TradeDirection.FLAT -> 1.0
+                }
+                val unrealizedGross = when (p.direction) {
+                    TradeDirection.LONG -> (adverseExitPrice - p.entryPrice) * p.quantity
+                    TradeDirection.SHORT -> (p.entryPrice - adverseExitPrice) * p.quantity
+                    TradeDirection.FLAT -> 0.0
+                }
+                val estimatedExitFee = p.quantity * adverseExitPrice * config.feeRate
+                equity + unrealizedGross - estimatedExitFee
+            } ?: equity
+
             peakEquity = max(peakEquity, equity)
             if (peakEquity > 0.0) {
-                maxDrawdown = max(maxDrawdown, (peakEquity - equity) / peakEquity)
+                maxDrawdown = max(maxDrawdown, (peakEquity - markedEquity) / peakEquity)
             }
 
             // Last candle has no next open, so it cannot create a new position.
