@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,6 +53,7 @@ import ir.nobitextrader.app.data.MarketStats
 import ir.nobitextrader.app.data.NobitexCandlesApi
 import ir.nobitextrader.app.data.NobitexMarketApi
 import ir.nobitextrader.app.scanner.MarketScannerScreen
+import ir.nobitextrader.app.scanner.MarketScannerUiState
 import ir.nobitextrader.app.scanner.MarketScannerViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -120,8 +122,10 @@ private fun DashboardScreen(
     marketResult: MarketStats?,
     marketLoading: Boolean,
     marketError: String?,
+    scannerState: MarketScannerUiState,
     onOpenSettings: () -> Unit,
     onOpenScanner: () -> Unit,
+    onScanMarkets: () -> Unit,
     onRefreshMarket: () -> Unit
 ) {
     Column(
@@ -274,8 +278,80 @@ private fun DashboardScreen(
                     }
                     Text("◎", color = AfaCyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                 }
-                Button(onClick = onOpenScanner, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (english) "OPEN MARKET SCANNER  →" else "ورود به صفحه اسکن بازار  ←")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onScanMarkets,
+                        enabled = !scannerState.isScanning,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            if (scannerState.isScanning) {
+                                if (english) "SCANNING…" else "در حال اسکن…"
+                            } else {
+                                if (english) "SCAN ALL" else "اسکن همه بازار"
+                            },
+                            fontSize = 11.sp
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onOpenScanner,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            if (english) "OPEN SCANNER →" else "صفحه اسکن ←",
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+                if (scannerState.isScanning || scannerState.totalCount > 0) {
+                    Text(
+                        if (english) {
+                            "Progress: ${scannerState.completedCount} / ${scannerState.totalCount}"
+                        } else {
+                            "پیشرفت: ${scannerState.completedCount} / ${scannerState.totalCount}"
+                        },
+                        color = AfaMuted,
+                        fontSize = 11.sp
+                    )
+                }
+                if (scannerState.results.isNotEmpty()) {
+                    val successful = scannerState.results.count { it.success }
+                    val failed = scannerState.results.size - successful
+                    Text(
+                        if (english) {
+                            "Valid books: $successful   •   Failed: $failed"
+                        } else {
+                            "دفتر سفارش معتبر: $successful   •   ناموفق: $failed"
+                        },
+                        color = AfaMuted,
+                        fontSize = 11.sp
+                    )
+                    scannerState.results
+                        .asSequence()
+                        .filter { it.success }
+                        .take(3)
+                        .forEach { result ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    result.symbol,
+                                    color = AfaCyan,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    (if (english) "Spread " else "اختلاف ") +
+                                        String.format(Locale.US, "%.3f%%", result.spreadPercent),
+                                    color = AfaMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                }
+                scannerState.errorMessage?.let { message ->
+                    Text(message, color = AfaLoss, fontSize = 11.sp)
                 }
             }
         }
@@ -419,6 +495,7 @@ class MainActivity : ComponentActivity() {
 
             val scope = rememberCoroutineScope()
             val english = settings.useEnglish
+            val scannerState by scannerViewModel.uiState.collectAsState()
 
             var marketResult by remember {
                 mutableStateOf<MarketStats?>(null)
@@ -541,8 +618,10 @@ class MainActivity : ComponentActivity() {
                                 marketResult = marketResult,
                                 marketLoading = marketLoading,
                                 marketError = marketError,
+                                scannerState = scannerState,
                                 onOpenSettings = { screen = AppScreen.SETTINGS },
                                 onOpenScanner = { screen = AppScreen.SCANNER },
+                                onScanMarkets = { scannerViewModel.scanMarkets() },
                                 onRefreshMarket = {
                                     scope.launch {
                                         marketLoading = true
