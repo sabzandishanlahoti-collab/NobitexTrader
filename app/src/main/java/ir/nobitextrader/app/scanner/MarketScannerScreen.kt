@@ -370,6 +370,7 @@ fun MarketScannerScreen(
                 MarketResultCard(
                     result = result,
                     rank = if (result.success) index + 1 else null,
+                    sortMode = state.sortMode,
                     analysisState = state.analysisBySymbol[result.symbol],
                     onAnalyze = { viewModel.analyzeMarket(result.symbol) }
                 )
@@ -485,6 +486,7 @@ private fun SortButton(
 private fun MarketResultCard(
     result: MarketScanResult,
     rank: Int?,
+    sortMode: MarketSortMode,
     analysisState: StrategyAnalysisUiState?,
     onAnalyze: () -> Unit
 ) {
@@ -537,6 +539,24 @@ private fun MarketResultCard(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+            }
+
+            if (result.success && rank != null) {
+                val rankingBasis = when (sortMode) {
+                    MarketSortMode.BALANCED_PRIORITY ->
+                        "اولویت ترکیبی: اختلاف قیمت ۵۰٪ • عمق خرید ۲۵٪ • عمق فروش ۲۵٪"
+                    MarketSortMode.SPREAD_LOW_TO_HIGH ->
+                        "مرتب‌شده بر اساس کمترین اختلاف قیمت"
+                    MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW ->
+                        "مرتب‌شده بر اساس بیشترین عمق خرید"
+                    MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW ->
+                        "مرتب‌شده بر اساس بیشترین عمق فروش"
+                }
+                Text(
+                    rankingBasis,
+                    color = TerminalMuted,
+                    fontSize = 10.sp
+                )
             }
 
             if (!result.success) {
