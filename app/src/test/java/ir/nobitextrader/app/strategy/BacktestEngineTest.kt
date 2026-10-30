@@ -119,7 +119,12 @@ class BacktestEngineTest {
             feeRate = 0.0, slippageRate = 0.0
         )) { history ->
             if (history.size == 1) {
-                (history as MutableList<Candle>)[0] = c(1, 700.0, 701.0, 699.0, 700.0)
+                try {
+                    (history as MutableList<Candle>)[0] = c(1, 700.0, 701.0, 699.0, 700.0)
+                    throw AssertionError("Signal callback unexpectedly mutated its candle history")
+                } catch (_: UnsupportedOperationException) {
+                    // The callback receives a read-only snapshot.
+                }
                 BacktestSignal(TradeDirection.LONG, 95.0, 110.0)
             } else null
         }
