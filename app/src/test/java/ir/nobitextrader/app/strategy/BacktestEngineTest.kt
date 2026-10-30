@@ -101,7 +101,8 @@ class BacktestEngineTest {
             feeRate = 0.0, slippageRate = 0.0
         )) { if (it.size == 1) BacktestSignal(TradeDirection.LONG, 80.0, 120.0) else null }
 
-        assertEquals(0.01, result.maxDrawdown, 0.000001)
+        // Intrabar low of 89 is more adverse than the final close of 90.
+        assertEquals(0.011, result.maxDrawdown, 0.000001)
         assertEquals(ExitReason.END_OF_DATA, result.trades.single().exitReason)
     }
 
