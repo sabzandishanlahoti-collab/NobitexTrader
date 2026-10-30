@@ -20,7 +20,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -147,7 +146,7 @@ fun MarketScannerScreen(
             OutlinedButton(
                 onClick = { viewModel.clearResults() },
                 enabled = !state.isScanning && state.results.isNotEmpty(),
-                colors = OutlinedButtonDefaults.colors(
+                colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = TerminalMuted,
                     disabledContentColor = TerminalBorder
                 ),
@@ -350,7 +349,7 @@ fun MarketScannerScreen(
                 )
                 OutlinedButton(
                     onClick = { viewModel.cancelScan() },
-                    colors = OutlinedButtonDefaults.colors(contentColor = TerminalRed),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TerminalRed),
                     shape = RoundedCornerShape(9.dp)
                 ) {
                     Text("توقف")
@@ -408,7 +407,7 @@ private fun TerminalChoiceButton(
     OutlinedButton(
         onClick = onClick,
         modifier = modifier,
-        colors = OutlinedButtonDefaults.colors(contentColor = TerminalGreen),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = TerminalGreen),
         shape = RoundedCornerShape(9.dp)
     ) {
         Text(text, fontSize = 11.sp)
@@ -426,7 +425,7 @@ private fun TerminalActionButton(
         OutlinedButton(
             onClick = onClick,
             modifier = modifier,
-            colors = OutlinedButtonDefaults.colors(contentColor = TerminalGreen),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TerminalGreen),
             shape = RoundedCornerShape(10.dp)
         ) {
             Text(text)
@@ -469,7 +468,7 @@ private fun SortButton(
         OutlinedButton(
             onClick = onClick,
             modifier = modifier,
-            colors = OutlinedButtonDefaults.colors(contentColor = TerminalMuted),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = TerminalMuted),
             shape = RoundedCornerShape(9.dp)
         ) {
             Text(text, fontSize = 11.sp)
