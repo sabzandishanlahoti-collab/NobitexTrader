@@ -72,7 +72,7 @@ class MarketScannerViewModelAnalysisTest {
             )
             val viewModel = MarketScannerViewModel(coordinator)
 
-            viewModel.analyzeMarket("bt cirt")
+            viewModel.analyzeMarket(" btcirt ")
             viewModel.analyzeMarket("BTCIRT")
             runCurrent()
 
