@@ -19,7 +19,7 @@ class NobitexTradesApiTest {
         )
 
         assertEquals(2, result.size)
-        assertEquals(1588689375067000L, result[0].timeMillis)
+        assertEquals(1588689375067L, result[0].timeMillis)
         assertEquals(1_470_000_110.0, result[0].price, 0.0)
         assertEquals(0.002, result[0].volume, 0.0)
         assertEquals(TradeSide.SELL, result[0].type)
