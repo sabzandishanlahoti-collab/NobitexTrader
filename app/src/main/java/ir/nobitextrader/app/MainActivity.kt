@@ -353,6 +353,65 @@ private fun DashboardScreen(
                 scannerState.errorMessage?.let { message ->
                     Text(message, color = AfaLoss, fontSize = 11.sp)
                 }
+                val analyzedMarkets = scannerState.analysisBySymbol.entries
+                    .filter { it.value.result != null || it.value.error != null || it.value.isLoading }
+                    .take(4)
+                if (analyzedMarkets.isNotEmpty()) {
+                    HorizontalDivider(color = Color(0xFF29404E))
+                    Text(
+                        if (english) "STRATEGY ANALYSIS" else "خلاصه تحلیل استراتژی",
+                        color = AfaCyan,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                    analyzedMarkets.forEach { (symbol, analysisState) ->
+                        val decision = analysisState.result?.decision
+                        val status = when {
+                            analysisState.isLoading -> if (english) "ANALYZING" else "در حال تحلیل"
+                            analysisState.error != null -> if (english) "ERROR" else "خطا"
+                            decision?.isActionable == true -> decision.direction.name
+                            else -> if (english) "NO TRADE" else "بدون معامله"
+                        }
+                        val statusColor = when {
+                            analysisState.isLoading -> AfaMuted
+                            analysisState.error != null -> AfaLoss
+                            decision?.isActionable == true -> AfaProfit
+                            else -> Color(0xFFFFC66D)
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                symbol,
+                                color = AfaCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                status,
+                                color = statusColor,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (decision?.isActionable == true) {
+                            Text(
+                                (if (english) "Agreement " else "توافق ") +
+                                    decision.agreeingStrategyIds.size +
+                                    " • " +
+                                    String.format(Locale.US, "%.1f%%", decision.confidence * 100.0),
+                                color = AfaMuted,
+                                fontSize = 9.sp
+                            )
+                        }
+                    }
+                    Text(
+                        if (english) "Analysis signals only — no order has been placed." else "این‌ها فقط خروجی تحلیل هستند؛ هیچ سفارشی ثبت نشده است.",
+                        color = AfaMuted,
+                        fontSize = 9.sp
+                    )
+                }
             }
         }
 
