@@ -323,7 +323,7 @@ private fun DashboardScreen(
                     )
                     Text(
                         (if (english) "24h change: " else "تغییر روزانه: ") + marketResult.dayChange + "%",
-                        color = if (marketResult.dayChange.toDoubleOrNull()?.let { it >= 0 } == true) AfaProfit else AfaLoss,
+                        color = if (marketResult.dayChange >= 0.0) AfaProfit else AfaLoss,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
