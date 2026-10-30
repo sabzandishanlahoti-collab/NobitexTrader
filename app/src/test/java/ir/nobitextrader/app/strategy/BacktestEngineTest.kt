@@ -74,6 +74,23 @@ class BacktestEngineTest {
     }
 
     @Test
+    fun adverseIntrabarPriceContributesToUnrealizedMaxDrawdown() {
+        val candles = listOf(
+            c(1, 100.0, 101.0, 99.0, 100.0),
+            c(2, 100.0, 101.0, 90.0, 100.0)
+        )
+        val result = BacktestEngine().run(candles, BacktestConfig(
+            initialCapital = 10_000.0, positionNotional = 1_000.0,
+            feeRate = 0.0, slippageRate = 0.0
+        )) { if (it.size == 1) BacktestSignal(TradeDirection.LONG, 80.0, 120.0) else null }
+
+        // The position recovers by the close, but the intrabar 10% adverse move
+        // on a 10% position allocation must still register as 1% account drawdown.
+        assertEquals(0.01, result.maxDrawdown, 0.000001)
+        assertEquals(ExitReason.END_OF_DATA, result.trades.single().exitReason)
+    }
+
+    @Test
     fun endOfDataLiquidationContributesToMaxDrawdown() {
         val candles = listOf(
             c(1, 100.0, 101.0, 99.0, 100.0),
