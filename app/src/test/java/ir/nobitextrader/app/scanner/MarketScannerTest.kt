@@ -150,4 +150,43 @@ class MarketScannerTest {
         assertTrue(sorted.all { it.success })
     }
 
+    @Test
+    fun equalSortMetricsPreserveOriginalOrderAndFailedOrder() {
+        val input = listOf(
+            result("FAILFIRST", 0.0, 0.0, 0.0, success = false),
+            result("BTCIRT", 1.0, 100.0, 100.0),
+            result("ETHIRT", 1.0, 100.0, 100.0),
+            result("FAILSECOND", 0.0, 0.0, 0.0, success = false)
+        )
+
+        val sorted = MarketScanner.sortResults(
+            input,
+            MarketSortMode.SPREAD_LOW_TO_HIGH
+        )
+
+        assertEquals(
+            listOf("BTCIRT", "ETHIRT", "FAILFIRST", "FAILSECOND"),
+            sorted.map { it.symbol }
+        )
+    }
+
+    @Test
+    fun balancedPriorityPreservesOrderWhenEveryScoreIsEqual() {
+        val input = listOf(
+            result("BTCIRT", 1.0, 100.0, 100.0),
+            result("ETHIRT", 1.0, 100.0, 100.0),
+            result("LTCIRT", 1.0, 100.0, 100.0)
+        )
+
+        val sorted = MarketScanner.sortResults(
+            input,
+            MarketSortMode.BALANCED_PRIORITY
+        )
+
+        assertEquals(
+            listOf("BTCIRT", "ETHIRT", "LTCIRT"),
+            sorted.map { it.symbol }
+        )
+    }
+
 }
