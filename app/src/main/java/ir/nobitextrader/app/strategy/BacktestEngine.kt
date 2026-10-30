@@ -114,6 +114,11 @@ class BacktestEngine {
         }
 
         position?.let { close(candles.lastIndex, candles.last().close, ExitReason.END_OF_DATA) }
+        // Include the final end-of-data liquidation in realized-equity drawdown.
+        peakEquity = max(peakEquity, equity)
+        if (peakEquity > 0.0) {
+            maxDrawdown = max(maxDrawdown, (peakEquity - equity) / peakEquity)
+        }
 
         val winners = trades.count { it.netPnl > 0.0 }
         val losers = trades.count { it.netPnl < 0.0 }
