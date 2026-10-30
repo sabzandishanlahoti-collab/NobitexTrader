@@ -80,25 +80,6 @@ class BacktestEngine {
                 pending = null
             }
 
-            position?.let { p ->
-                // A gap through the stop is filled at the worse opening price.
-                val stopGap = if (p.direction == TradeDirection.LONG)
-                    candle.open <= p.stopLossPrice else candle.open >= p.stopLossPrice
-                val targetGap = if (p.direction == TradeDirection.LONG)
-                    candle.open >= p.takeProfitPrice else candle.open <= p.takeProfitPrice
-                val stopTouched = if (p.direction == TradeDirection.LONG)
-                    candle.low <= p.stopLossPrice else candle.high >= p.stopLossPrice
-                val targetTouched = if (p.direction == TradeDirection.LONG)
-                    candle.high >= p.takeProfitPrice else candle.low <= p.takeProfitPrice
-
-                when {
-                    stopGap -> close(index, candle.open, ExitReason.STOP_LOSS)
-                    targetGap -> close(index, p.takeProfitPrice, ExitReason.TAKE_PROFIT)
-                    stopTouched -> close(index, p.stopLossPrice, ExitReason.STOP_LOSS)
-                    targetTouched -> close(index, p.takeProfitPrice, ExitReason.TAKE_PROFIT)
-                }
-            }
-
             // Mark open positions at the adverse intrabar extreme so temporary
             // unrealized losses are included in maximum drawdown.
             val markedEquity = position?.let { p ->
@@ -124,6 +105,25 @@ class BacktestEngine {
             peakEquity = max(peakEquity, equity)
             if (peakEquity > 0.0) {
                 maxDrawdown = max(maxDrawdown, (peakEquity - markedEquity) / peakEquity)
+            }
+
+            position?.let { p ->
+                // A gap through the stop is filled at the worse opening price.
+                val stopGap = if (p.direction == TradeDirection.LONG)
+                    candle.open <= p.stopLossPrice else candle.open >= p.stopLossPrice
+                val targetGap = if (p.direction == TradeDirection.LONG)
+                    candle.open >= p.takeProfitPrice else candle.open <= p.takeProfitPrice
+                val stopTouched = if (p.direction == TradeDirection.LONG)
+                    candle.low <= p.stopLossPrice else candle.high >= p.stopLossPrice
+                val targetTouched = if (p.direction == TradeDirection.LONG)
+                    candle.high >= p.takeProfitPrice else candle.low <= p.takeProfitPrice
+
+                when {
+                    stopGap -> close(index, candle.open, ExitReason.STOP_LOSS)
+                    targetGap -> close(index, p.takeProfitPrice, ExitReason.TAKE_PROFIT)
+                    stopTouched -> close(index, p.stopLossPrice, ExitReason.STOP_LOSS)
+                    targetTouched -> close(index, p.takeProfitPrice, ExitReason.TAKE_PROFIT)
+                }
             }
 
             // Last candle has no next open, so it cannot create a new position.
