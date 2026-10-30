@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +29,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
@@ -45,6 +53,49 @@ private enum class AppScreen {
     HOME,
     SETTINGS,
     SCANNER
+}
+
+
+@androidx.compose.runtime.Composable
+private fun AfaBrandHeader() {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "A",
+            fontSize = 46.sp,
+            fontFamily = FontFamily.Cursive,
+            fontStyle = FontStyle.Italic,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF35DDE0),
+            style = TextStyle(
+                shadow = Shadow(
+                    color = Color(0xFF00DDE8).copy(alpha = 0.85f),
+                    offset = Offset.Zero,
+                    blurRadius = 18f
+                )
+            )
+        )
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(
+            text = "NOBITEX. TRADER.AFA.ESNIPER",
+            maxLines = 1,
+            softWrap = false,
+            fontSize = 14.sp,
+            letterSpacing = (-0.45).sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color(0xFFEAFBFC),
+            style = TextStyle(
+                shadow = Shadow(
+                    color = Color(0xFF35DDE0).copy(alpha = 0.55f),
+                    offset = Offset.Zero,
+                    blurRadius = 9f
+                )
+            )
+        )
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -116,9 +167,26 @@ class MainActivity : ComponentActivity() {
 
             MaterialTheme(
                 colorScheme = if (settings.darkTheme) {
-                    darkColorScheme()
+                    darkColorScheme(
+                        primary = Color(0xFF35DDE0),
+                        onPrimary = Color(0xFF00191B),
+                        secondary = Color(0xFF8CECEF),
+                        background = Color(0xFF070D18),
+                        surface = Color(0xFF101B2B),
+                        surfaceVariant = Color(0xFF19283A),
+                        onBackground = Color(0xFFEAFBFC),
+                        onSurface = Color(0xFFEAFBFC),
+                        onSurfaceVariant = Color(0xFFA9C2CC)
+                    )
                 } else {
-                    lightColorScheme()
+                    lightColorScheme(
+                        primary = Color(0xFF008F98),
+                        secondary = Color(0xFF087E88),
+                        background = Color(0xFFF3FAFB),
+                        surface = Color(0xFFFFFFFF),
+                        onBackground = Color(0xFF102329),
+                        onSurface = Color(0xFF102329)
+                    )
                 }
             ) {
                 Surface(
@@ -179,21 +247,8 @@ class MainActivity : ComponentActivity() {
                                 verticalArrangement = Arrangement.Center,
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(
-                                    text = "NobitexTrader",
-                                    fontSize = 28.sp
-                                )
+                                AfaBrandHeader()
 
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Text(
-                                    text = if (english) {
-                                        "Nobitex Trading Bot"
-                                    } else {
-                                        "ربات معاملات نوبیتکس"
-                                    },
-                                    fontSize = 21.sp
-                                )
 
                                 Spacer(modifier = Modifier.height(20.dp))
 
