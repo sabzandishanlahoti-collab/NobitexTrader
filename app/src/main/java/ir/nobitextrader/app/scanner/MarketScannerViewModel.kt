@@ -28,6 +28,7 @@ data class MarketScannerUiState(
     val errorMessage: String? = null,
     val completedCount: Int = 0,
     val totalCount: Int = 0,
+    val successfulCount: Int = 0,
     val failedCount: Int = 0,
     val sortMode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY,
     val filterMode: MarketResultFilterMode = MarketResultFilterMode.ALL,
@@ -115,6 +116,7 @@ class MarketScannerViewModel(
                 errorMessage = null,
                 completedCount = 0,
                 totalCount = 0,
+                successfulCount = 0,
                 failedCount = 0
             )
 
@@ -148,6 +150,7 @@ class MarketScannerViewModel(
                                         filterMode = current.filterMode
                                     ),
                                     completedCount = snapshot.size,
+                                    successfulCount = snapshot.count { it.success },
                                     failedCount = snapshot.count { !it.success }
                                 )
                             }
@@ -184,6 +187,7 @@ class MarketScannerViewModel(
                     errorMessage = null,
                     completedCount = results.size,
                     totalCount = results.size,
+                    successfulCount = results.count { it.success },
                     failedCount = results.count { !it.success }
                 )
             } catch (e: CancellationException) {
@@ -202,6 +206,7 @@ class MarketScannerViewModel(
                         ),
                         errorMessage = e.message
                             ?: "اسکن بازار ناموفق بود.",
+                        successfulCount = allResults.count { it.success },
                         failedCount = allResults.count { !it.success }
                     )
                 }
@@ -371,6 +376,7 @@ class MarketScannerViewModel(
             errorMessage = null,
             completedCount = 0,
             totalCount = 0,
+            successfulCount = 0,
             failedCount = 0,
             analysisBySymbol = emptyMap()
         )
