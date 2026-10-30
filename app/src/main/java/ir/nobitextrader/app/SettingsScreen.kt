@@ -41,12 +41,12 @@ import java.util.Locale
 
 private const val SETTINGS_PREFS = "nobitex_trader_settings"
 
-private val AccentGreen = Color(0xFF648F7B)
-private val AccentGreenDark = Color(0xFF426B59)
-private val DarkBackground = Color(0xFF101714)
-private val DarkSurface = Color(0xFF19221E)
-private val DarkSurfaceAlt = Color(0xFF202B26)
-private val LightBackground = Color(0xFFF2F5F2)
+private val AccentGreen = Color(0xFF35DDE0)
+private val AccentGreenDark = Color(0xFF087E88)
+private val DarkBackground = Color(0xFF070D18)
+private val DarkSurface = Color(0xFF101B2B)
+private val DarkSurfaceAlt = Color(0xFF19283A)
+private val LightBackground = Color(0xFFF3FAFB)
 private val LightSurface = Color(0xFFFFFFFF)
 
 data class TraderSettings(
@@ -114,14 +114,14 @@ fun SettingsScreen(
         darkColorScheme(
             primary = AccentGreen,
             onPrimary = Color(0xFF07110C),
-            secondary = Color(0xFF8BAE9B),
+            secondary = Color(0xFF8CECEF),
             background = DarkBackground,
             surface = DarkSurface,
             surfaceVariant = DarkSurfaceAlt,
-            onBackground = Color(0xFFE5ECE7),
-            onSurface = Color(0xFFE5ECE7),
-            onSurfaceVariant = Color(0xFFB5C2BA),
-            outline = Color(0xFF3A4941)
+            onBackground = Color(0xFFEAFBFC),
+            onSurface = Color(0xFFEAFBFC),
+            onSurfaceVariant = Color(0xFFA9C2CC),
+            outline = Color(0xFF31515A)
         )
     } else {
         lightColorScheme(
@@ -130,11 +130,11 @@ fun SettingsScreen(
             secondary = AccentGreen,
             background = LightBackground,
             surface = LightSurface,
-            surfaceVariant = Color(0xFFE8EEE9),
-            onBackground = Color(0xFF17211B),
-            onSurface = Color(0xFF17211B),
-            onSurfaceVariant = Color(0xFF526158),
-            outline = Color(0xFFD1DAD3)
+            surfaceVariant = Color(0xFFE1F2F3),
+            onBackground = Color(0xFF102329),
+            onSurface = Color(0xFF102329),
+            onSurfaceVariant = Color(0xFF526B72),
+            outline = Color(0xFFC9E0E2)
         )
     }
 
@@ -371,7 +371,7 @@ private fun SettingsSection(
         color = if (dark) DarkSurface else LightSurface,
         border = BorderStroke(
             1.dp,
-            if (dark) Color(0xFF2B3931) else Color(0xFFE0E7E1)
+            if (dark) Color(0xFF24414A) else Color(0xFFE0E7E1)
         ),
         tonalElevation = 1.dp
     ) {
@@ -429,12 +429,12 @@ private fun SettingSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color(0xFFE7EFE9),
+                checkedThumbColor = Color(0xFFE8FCFC),
                 checkedTrackColor = AccentGreenDark,
                 checkedBorderColor = AccentGreen,
-                uncheckedThumbColor = Color(0xFFB5BDB8),
-                uncheckedTrackColor = Color(0xFF3B4540),
-                uncheckedBorderColor = Color(0xFF657169)
+                uncheckedThumbColor = Color(0xFFB6C9CC),
+                uncheckedTrackColor = Color(0xFF263E46),
+                uncheckedBorderColor = Color(0xFF5C7B82)
             )
         )
     }
@@ -476,7 +476,7 @@ private fun SettingSlider(
                 thumbColor = AccentGreen,
                 activeTrackColor = AccentGreenDark,
                 inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
-                activeTickColor = Color(0xFFB7C9BE),
+                activeTickColor = Color(0xFFB7F4F4),
                 inactiveTickColor = MaterialTheme.colorScheme.outline
             )
         )
@@ -490,13 +490,13 @@ private fun StatusTag(
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = if (dark) Color(0xFF26372E) else Color(0xFFE5EEE7)
+        color = if (dark) Color(0xFF16343B) else Color(0xFFE5EEE7)
     ) {
         Text(
             text = text,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelSmall,
-            color = if (dark) Color(0xFFB7C9BE) else AccentGreenDark,
+            color = if (dark) Color(0xFFB7F4F4) else AccentGreenDark,
             fontWeight = FontWeight.Bold
         )
     }
