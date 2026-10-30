@@ -168,4 +168,95 @@ class NobitexCandlesApiTest {
             NobitexCandlesApi.parseResponse(response)
         }
     }
+
+    @Test
+    fun blankResponseThrowsIOException() {
+        assertIOException {
+            NobitexCandlesApi.parseResponse("  \\n")
+        }
+    }
+
+    @Test
+    fun unexpectedResponseStatusThrowsIOException() {
+        assertIOException {
+            NobitexCandlesApi.parseResponse("""{"s":"unknown"}""")
+        }
+    }
+
+    @Test
+    fun missingVolumeArrayThrowsIOException() {
+        val response = """
+            {
+              "s": "ok",
+              "t": [1720000000],
+              "o": [60000],
+              "h": [61000],
+              "l": [59000],
+              "c": [60500]
+            }
+        """.trimIndent()
+
+        assertIOException {
+            NobitexCandlesApi.parseResponse(response)
+        }
+    }
+
+    @Test
+    fun negativeTimestampThrowsIOException() {
+        val response = """
+            {
+              "s": "ok",
+              "t": [-1],
+              "o": [60000],
+              "h": [61000],
+              "l": [59000],
+              "c": [60500],
+              "v": [10.0]
+            }
+        """.trimIndent()
+
+        assertIOException {
+            NobitexCandlesApi.parseResponse(response)
+        }
+    }
+
+    @Test
+    fun timestampThatOverflowsMillisecondsThrowsIOException() {
+        val response = """
+            {
+              "s": "ok",
+              "t": [9223372036854776],
+              "o": [60000],
+              "h": [61000],
+              "l": [59000],
+              "c": [60500],
+              "v": [10.0]
+            }
+        """.trimIndent()
+
+        assertIOException {
+            NobitexCandlesApi.parseResponse(response)
+        }
+    }
+
+    @Test
+    fun zeroVolumeIsAccepted() {
+        val response = """
+            {
+              "s": "ok",
+              "t": [1720000000],
+              "o": [60000],
+              "h": [61000],
+              "l": [59000],
+              "c": [60500],
+              "v": [0.0]
+            }
+        """.trimIndent()
+
+        val candles = NobitexCandlesApi.parseResponse(response)
+
+        assertEquals(1, candles.size)
+        assertEquals(0.0, candles.single().volume, 0.0)
+    }
+
 }
