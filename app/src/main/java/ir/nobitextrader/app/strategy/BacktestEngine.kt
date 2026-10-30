@@ -128,7 +128,7 @@ class BacktestEngine {
 
             // Last candle has no next open, so it cannot create a new position.
             if (index < candles.lastIndex && position == null) {
-                signalAtClose(candles.subList(0, index + 1))?.let { signal ->
+                signalAtClose(candles.subList(0, index + 1).toList())?.let { signal ->
                     validateSignal(signal, candle.close)
                     pending = signal
                 }
