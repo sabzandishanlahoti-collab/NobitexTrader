@@ -38,7 +38,8 @@ object MarketScanner {
     suspend fun scan(
         symbols: List<String> = defaultMarkets,
         policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT,
-        onProgress: ((completed: Int, total: Int) -> Unit)? = null
+        onProgress: ((completed: Int, total: Int) -> Unit)? = null,
+        onResult: ((MarketScanResult) -> Unit)? = null
     ): List<MarketScanResult> {
         val validSymbols = symbols
             .map { it.trim().uppercase(Locale.ROOT) }
@@ -58,7 +59,9 @@ object MarketScanner {
                     symbol = symbol,
                     timeoutMillis = policy.requestTimeoutMillis
                 )
-                results.add(toScanResult(snapshot))
+                val result = toScanResult(snapshot)
+                results.add(result)
+                onResult?.invoke(result)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -67,7 +70,7 @@ object MarketScanner {
                         symbol = symbol,
                         message = e.message
                             ?: "خطای دریافت اطلاعات بازار"
-                    )
+                    ).also { onResult?.invoke(it) }
                 )
             } finally {
                 completed++
@@ -85,12 +88,12 @@ object MarketScanner {
      */
     suspend fun scanAll(
         policy: MarketRefreshPolicy = MarketRefreshPolicy.DEFAULT,
-        onProgress: ((completed: Int, total: Int) -> Unit)? = null
+        onProgress: ((completed: Int, total: Int) -> Unit)? = null,
+        onResult: ((MarketScanResult) -> Unit)? = null
     ): List<MarketScanResult> {
         val snapshots = NobitexOrderBookApi.fetchAll(
             timeoutMillis = policy.requestTimeoutMillis,
-            maxMarkets = policy.maxMarketsPerBatch,
-            onProgress = onProgress
+            maxMarkets = policy.maxMarketsPerBatch
         )
 
         val validSnapshots = snapshots
@@ -105,7 +108,9 @@ object MarketScanner {
 
         for (snapshot in validSnapshots) {
             try {
-                results.add(toScanResult(snapshot))
+                val result = toScanResult(snapshot)
+                results.add(result)
+                onResult?.invoke(result)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -114,7 +119,7 @@ object MarketScanner {
                         symbol = snapshot.symbol,
                         message = e.message
                             ?: "خطای پردازش دفتر سفارش"
-                    )
+                    ).also { onResult?.invoke(it) }
                 )
             } finally {
                 completed++
