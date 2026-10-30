@@ -367,7 +367,11 @@ fun MarketScannerScreen(
                 items = visibleResults,
                 key = { "${it.symbol}_${it.success}" }
             ) { result ->
-                MarketResultCard(result)
+                MarketResultCard(
+                    result = result,
+                    analysisState = state.analysisBySymbol[result.symbol],
+                    onAnalyze = { viewModel.analyzeMarket(result.symbol) }
+                )
             }
         }
     }
@@ -478,7 +482,9 @@ private fun SortButton(
 
 @Composable
 private fun MarketResultCard(
-    result: MarketScanResult
+    result: MarketScanResult,
+    analysisState: StrategyAnalysisUiState?,
+    onAnalyze: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -549,8 +555,129 @@ private fun MarketResultCard(
                     DataValue("عمق خرید ۵ سطح", formatNumber(result.bidLiquidityTop5))
                     DataValue("عمق فروش ۵ سطح", formatNumber(result.askLiquidityTop5))
                 }
+
+                OutlinedButton(
+                    onClick = onAnalyze,
+                    enabled = analysisState?.isLoading != true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = TerminalGreen,
+                        disabledContentColor = TerminalMuted
+                    ),
+                    shape = RoundedCornerShape(9.dp)
+                ) {
+                    Text(
+                        if (analysisState?.isLoading == true) {
+                            "در حال تحلیل کندل‌ها..."
+                        } else {
+                            "تحلیل استراتژی‌ها (۱۵ دقیقه)"
+                        },
+                        fontSize = 12.sp
+                    )
+                }
+
+                analysisState?.let { analysis ->
+                    StrategyAnalysisPanel(analysis)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun StrategyAnalysisPanel(
+    state: StrategyAnalysisUiState
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(TerminalPanelAlt, RoundedCornerShape(10.dp))
+            .border(1.dp, TerminalBorder, RoundedCornerShape(10.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            "تحلیل کندلی مستقل • بازه ۴۸ ساعت",
+            color = TerminalGreen,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        if (state.isLoading) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = TerminalGreen,
+                    strokeWidth = 2.dp
+                )
+                Text("دریافت کندل و ارزیابی استراتژی‌ها...", color = TerminalMuted, fontSize = 11.sp)
+            }
+        }
+
+        state.error?.let {
+            Text("خطای تحلیل: $it", color = TerminalRed, fontSize = 11.sp)
+        }
+
+        state.result?.let { analysis ->
+            Text(
+                "تعداد کندل دریافتی: ${analysis.candles.size}",
+                color = TerminalMuted,
+                fontSize = 11.sp
+            )
+
+            if (!analysis.isFetchSuccessful) {
+                Text(
+                    "دریافت داده ناموفق: ${analysis.fetchError}",
+                    color = TerminalRed,
+                    fontSize = 11.sp
+                )
+            } else {
+                val decision = analysis.decision
+                if (decision == null) {
+                    Text("NO TRADE • تصمیمی در دسترس نیست", color = TerminalAmber, fontWeight = FontWeight.Bold)
+                } else {
+                    val directionLabel = when {
+                        decision.isActionable && decision.direction.name == "LONG" -> "LONG"
+                        decision.isActionable && decision.direction.name == "SHORT" -> "SHORT"
+                        decision.candidateDirection?.name == "LONG" -> "نامزد LONG"
+                        decision.candidateDirection?.name == "SHORT" -> "نامزد SHORT"
+                        else -> "NO TRADE"
+                    }
+                    Text(
+                        directionLabel,
+                        color = if (decision.isActionable) TerminalGreen else TerminalAmber,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "توافق استراتژی‌ها: ${decision.agreeingStrategyIds.size}",
+                        color = TerminalText,
+                        fontSize = 11.sp
+                    )
+                    if (decision.isActionable) {
+                        Text(
+                            "میانگین اطمینان: ${String.format(Locale.US, "%.1f", decision.confidence * 100.0)}٪",
+                            color = TerminalGreen,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Text(
+                        decision.reason,
+                        color = TerminalMuted,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
+        Text(
+            "فقط تحلیل و سیگنال؛ هیچ سفارش یا معامله‌ای ثبت نمی‌شود.",
+            color = TerminalAmber,
+            fontSize = 10.sp
+        )
     }
 }
 
