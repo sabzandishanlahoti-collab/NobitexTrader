@@ -164,10 +164,17 @@ object NobitexTradesApi {
     }
 
     private fun readLong(json: JSONObject, key: String, index: Int): Long {
-        val value = readNumber(json, key, index)
-        if (value % 1.0 != 0.0 || value > Long.MAX_VALUE.toDouble()) {
-            throw IOException("Invalid integer trade field '$key' at index $index")
+        if (!json.has(key) || json.isNull(key)) {
+            throw IOException("Missing trade field '$key' at index $index")
         }
-        return value.toLong()
+
+        val raw = json.get(key)
+        val value = when (raw) {
+            is Number -> raw.toString().toLongOrNull()
+            is String -> raw.trim().toLongOrNull()
+            else -> null
+        } ?: throw IOException("Invalid integer trade field '$key' at index $index")
+
+        return value
     }
 }
