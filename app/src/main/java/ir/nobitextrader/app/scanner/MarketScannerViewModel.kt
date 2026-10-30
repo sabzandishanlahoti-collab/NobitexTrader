@@ -3,6 +3,8 @@ package ir.nobitextrader.app.scanner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ir.nobitextrader.app.TraderSettings
+import ir.nobitextrader.app.strategy.StrategyAnalysisCoordinator
+import ir.nobitextrader.app.strategy.StrategyAnalysisResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,6 +15,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+data class StrategyAnalysisUiState(
+    val isLoading: Boolean = false,
+    val result: StrategyAnalysisResult? = null,
+    val error: String? = null
+)
+
 data class MarketScannerUiState(
     val isScanning: Boolean = false,
     val results: List<MarketScanResult> = emptyList(),
@@ -22,16 +30,21 @@ data class MarketScannerUiState(
     val sortMode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY,
     val filterMode: MarketResultFilterMode = MarketResultFilterMode.ALL,
     val autoRefreshEnabled: Boolean = false,
-    val refreshIntervalMs: Long = MarketRefreshPolicy.DEFAULT_INTERVAL_MS
+    val refreshIntervalMs: Long = MarketRefreshPolicy.DEFAULT_INTERVAL_MS,
+    val analysisBySymbol: Map<String, StrategyAnalysisUiState> = emptyMap()
 )
 
-class MarketScannerViewModel : ViewModel() {
+class MarketScannerViewModel(
+    private val analysisCoordinator: StrategyAnalysisCoordinator =
+        StrategyAnalysisCoordinator()
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MarketScannerUiState())
     val uiState: StateFlow<MarketScannerUiState> = _uiState.asStateFlow()
 
     private var scanJob: Job? = null
     private var autoRefreshJob: Job? = null
+    private val analysisJobs = mutableMapOf<String, Job>()
     private var scanGeneration = 0L
     private var allResults: List<MarketScanResult> = emptyList()
 
@@ -295,8 +308,51 @@ class MarketScannerViewModel : ViewModel() {
         )
     }
 
+    fun analyzeMarket(symbol: String) {
+        val normalizedSymbol = symbol.trim().uppercase(java.util.Locale.ROOT)
+        if (normalizedSymbol.isBlank()) return
+        if (analysisJobs[normalizedSymbol]?.isActive == true) return
+
+        analysisJobs[normalizedSymbol] = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                analysisBySymbol = _uiState.value.analysisBySymbol +
+                    (normalizedSymbol to StrategyAnalysisUiState(isLoading = true))
+            )
+            try {
+                val window = CandleAnalysisWindow.forNow(
+                    nowMillis = System.currentTimeMillis(),
+                    intervalSeconds = DEFAULT_CANDLE_INTERVAL_SECONDS,
+                    lookbackHours = DEFAULT_CANDLE_LOOKBACK_HOURS
+                )
+                val result = analysisCoordinator.analyze(
+                    symbol = normalizedSymbol,
+                    resolution = DEFAULT_CANDLE_RESOLUTION,
+                    fromUnixSeconds = window.fromUnixSeconds,
+                    toUnixSeconds = window.toUnixSeconds
+                )
+                _uiState.value = _uiState.value.copy(
+                    analysisBySymbol = _uiState.value.analysisBySymbol +
+                        (normalizedSymbol to StrategyAnalysisUiState(result = result))
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    analysisBySymbol = _uiState.value.analysisBySymbol +
+                        (normalizedSymbol to StrategyAnalysisUiState(
+                            error = e.message ?: "تحلیل ناموفق بود"
+                        ))
+                )
+            } finally {
+                analysisJobs.remove(normalizedSymbol)
+            }
+        }
+    }
+
     fun clearResults() {
         cancelScan()
+        analysisJobs.values.forEach { it.cancel() }
+        analysisJobs.clear()
         allResults = emptyList()
 
         _uiState.value = _uiState.value.copy(
@@ -304,7 +360,8 @@ class MarketScannerViewModel : ViewModel() {
             results = emptyList(),
             errorMessage = null,
             completedCount = 0,
-            totalCount = 0
+            totalCount = 0,
+            analysisBySymbol = emptyMap()
         )
     }
 
@@ -321,6 +378,43 @@ class MarketScannerViewModel : ViewModel() {
     override fun onCleared() {
         autoRefreshJob?.cancel()
         scanJob?.cancel()
+        analysisJobs.values.forEach { it.cancel() }
+        analysisJobs.clear()
         super.onCleared()
     }
 }
+
+
+/**
+ * Request bounds end at the opening timestamp of the last fully closed candle.
+ * This helper does not alter any indicator, price, volume, or risk calculation.
+ */
+internal data class CandleAnalysisWindow(
+    val fromUnixSeconds: Long,
+    val toUnixSeconds: Long
+) {
+    companion object {
+        fun forNow(
+            nowMillis: Long,
+            intervalSeconds: Long,
+            lookbackHours: Long
+        ): CandleAnalysisWindow {
+            require(nowMillis > 0L) { "nowMillis must be positive" }
+            require(intervalSeconds > 0L) { "intervalSeconds must be positive" }
+            require(lookbackHours > 0L) { "lookbackHours must be positive" }
+
+            val nowSeconds = nowMillis / 1_000L
+            val currentCandleOpen = nowSeconds - (nowSeconds % intervalSeconds)
+            val lastClosedCandleOpen = currentCandleOpen - intervalSeconds
+            val lookbackSeconds = Math.multiplyExact(lookbackHours, 3_600L)
+            val from = Math.subtractExact(lastClosedCandleOpen, lookbackSeconds)
+
+            require(from >= 0L) { "Analysis window starts before Unix epoch" }
+            return CandleAnalysisWindow(from, lastClosedCandleOpen)
+        }
+    }
+}
+
+private const val DEFAULT_CANDLE_RESOLUTION = "15"
+private const val DEFAULT_CANDLE_INTERVAL_SECONDS = 900L
+private const val DEFAULT_CANDLE_LOOKBACK_HOURS = 48L
