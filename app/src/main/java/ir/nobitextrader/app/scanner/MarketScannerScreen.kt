@@ -60,10 +60,10 @@ fun MarketScannerScreen(
     val visibleResults = state.results
     val successfulCount = visibleResults.count { it.success }
     val failedCount = state.failedCount
-    // Failed requests have their own counter and must not also be
-    // reported as successful markets hidden by the active filters.
+    // Count only completed requests; markets still being scanned are
+    // not filtered out. Failed requests have their own separate counter.
     val filteredOutCount =
-        (state.totalCount - visibleResults.size - failedCount).coerceAtLeast(0)
+        (state.completedCount - visibleResults.size - failedCount).coerceAtLeast(0)
 
     Column(
         modifier = modifier
