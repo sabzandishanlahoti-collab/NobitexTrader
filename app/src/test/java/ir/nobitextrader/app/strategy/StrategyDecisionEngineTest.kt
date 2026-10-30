@@ -118,7 +118,10 @@ class StrategyDecisionEngineTest {
         )
 
         assertFalse(result.isActionable)
-        assertTrue(result.agreeingStrategyIds.isEmpty())
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertEquals(TradeDirection.LONG, result.candidateDirection)
+        assertEquals(listOf(StrategyId.FVG), result.agreeingStrategyIds)
+        assertTrue(result.reason.contains("Not enough agreeing"))
     }
 
     @Test
