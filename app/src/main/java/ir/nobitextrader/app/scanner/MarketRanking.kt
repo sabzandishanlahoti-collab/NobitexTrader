@@ -1,11 +1,11 @@
-
 package ir.nobitextrader.app.scanner
 
 /**
  * Deterministic ranking for successful market scan results.
  *
- * This class only ranks data already returned by the scanner.
- * It does not generate prices or simulate market data.
+ * Balanced priority uses only live order-book measurements:
+ * 50% spread quality, 25% bid depth and 25% ask depth.
+ * Failed or invalid measurements are never promoted above valid markets.
  */
 object MarketRanking {
 
@@ -19,67 +19,76 @@ object MarketRanking {
         val ranked = when (mode) {
             MarketSortMode.SPREAD_LOW_TO_HIGH ->
                 successful.sortedWith(
-                    compareBy<MarketScanResult> { it.spreadPercent }
-                        .thenBy { it.symbol }
+                    compareBy<MarketScanResult> { safeNonNegative(it.spreadPercent) }
                 )
 
             MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW ->
                 successful.sortedWith(
                     compareByDescending<MarketScanResult> {
-                        it.bidLiquidityTop5
-                    }.thenBy { it.symbol }
+                        safeNonNegative(it.bidLiquidityTop5)
+                    }
                 )
 
             MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW ->
                 successful.sortedWith(
                     compareByDescending<MarketScanResult> {
-                        it.askLiquidityTop5
-                    }.thenBy { it.symbol }
+                        safeNonNegative(it.askLiquidityTop5)
+                    }
                 )
 
             MarketSortMode.BALANCED_PRIORITY ->
-                successful.sortedWith(
-                    compareBy<MarketScanResult> {
-                        balancedScore(it)
-                    }.thenBy { it.symbol }
-                )
+                rankBalanced(successful)
         }
 
+        // Kotlin's sorted operations are stable: equal metrics retain scan order.
         return ranked + failed
     }
 
-    private fun balancedScore(
-        result: MarketScanResult
-    ): Double {
-        val spread = result.spreadPercent
-        val bidLiquidity = result.bidLiquidityTop5
-        val askLiquidity = result.askLiquidityTop5
+    private fun rankBalanced(
+        results: List<MarketScanResult>
+    ): List<MarketScanResult> {
+        if (results.size < 2) return results
 
-        if (
-            !spread.isFinite() ||
-            !bidLiquidity.isFinite() ||
-            !askLiquidity.isFinite() ||
-            spread < 0.0 ||
-            bidLiquidity < 0.0 ||
-            askLiquidity < 0.0
-        ) {
-            return Double.MAX_VALUE
+        val valid = results.filter(::hasValidRankingMetrics)
+        val invalid = results.filterNot(::hasValidRankingMetrics)
+        if (valid.size < 2) return valid + invalid
+
+        val minSpread = valid.minOf { it.spreadPercent }
+        val maxSpread = valid.maxOf { it.spreadPercent }
+        val maxBid = valid.maxOf { it.bidLiquidityTop5 }
+        val maxAsk = valid.maxOf { it.askLiquidityTop5 }
+
+        fun lowerIsBetter(value: Double, min: Double, max: Double): Double {
+            if (max <= min) return 1.0
+            return ((max - value) / (max - min)).coerceIn(0.0, 1.0)
         }
 
-        val totalLiquidity = bidLiquidity + askLiquidity
-        if (!totalLiquidity.isFinite() || totalLiquidity <= 0.0) {
-            return Double.MAX_VALUE
+        fun higherIsBetter(value: Double, max: Double): Double {
+            if (max <= 0.0) return 0.0
+            return (value / max).coerceIn(0.0, 1.0)
         }
 
-        val liquidityImbalance =
-            kotlin.math.abs(bidLiquidity - askLiquidity) / totalLiquidity
+        return valid.sortedByDescending { result ->
+            val spreadScore = lowerIsBetter(
+                result.spreadPercent,
+                minSpread,
+                maxSpread
+            )
+            val bidScore = higherIsBetter(result.bidLiquidityTop5, maxBid)
+            val askScore = higherIsBetter(result.askLiquidityTop5, maxAsk)
 
-        // Lower spread and better bid/ask balance receive higher priority.
-        // Liquidity contributes a bounded bonus so large values do not
-        // overwhelm the spread and imbalance components.
-        val liquidityBonus =
-            1.0 / (1.0 + kotlin.math.ln(1.0 + totalLiquidity))
-
-        return spread + liquidityImbalance - liquidityBonus
+            spreadScore * 0.50 + bidScore * 0.25 + askScore * 0.25
+        } + invalid
     }
+
+    private fun hasValidRankingMetrics(result: MarketScanResult): Boolean =
+        result.spreadPercent.isFinite() &&
+            result.spreadPercent >= 0.0 &&
+            result.bidLiquidityTop5.isFinite() &&
+            result.bidLiquidityTop5 >= 0.0 &&
+            result.askLiquidityTop5.isFinite() &&
+            result.askLiquidityTop5 >= 0.0
+
+    private fun safeNonNegative(value: Double): Double =
+        if (value.isFinite() && value >= 0.0) value else Double.MAX_VALUE
 }
