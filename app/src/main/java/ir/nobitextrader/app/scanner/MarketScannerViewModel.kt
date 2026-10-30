@@ -1,4 +1,3 @@
-
 package ir.nobitextrader.app.scanner
 
 import androidx.lifecycle.ViewModel
@@ -92,36 +91,63 @@ class MarketScannerViewModel : ViewModel() {
             maxMarketsPerBatch = maxMarketsPerBatch
         )
 
+        allResults = emptyList()
+
         scanJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isScanning = true,
+                results = emptyList(),
                 errorMessage = null,
                 completedCount = 0,
                 totalCount = 0
             )
 
+            // This list is written by the scanner's single sequential
+            // processing coroutine and copied before publishing to StateFlow.
+            val streamedResults = mutableListOf<MarketScanResult>()
+
             try {
                 val results = withContext(Dispatchers.IO) {
-                    if (symbols == null) {
-                        MarketScanner.scanAll(
-                            policy = policy,
-                            onProgress = { completed, total ->
+                    val progressCallback: (Int, Int) -> Unit =
+                        { completed, total ->
+                            if (generation == scanGeneration) {
                                 _uiState.value = _uiState.value.copy(
                                     completedCount = completed,
                                     totalCount = total
                                 )
                             }
+                        }
+
+                    val resultCallback: (MarketScanResult) -> Unit =
+                        { result ->
+                            if (generation == scanGeneration) {
+                                streamedResults.add(result)
+                                val snapshot = streamedResults.toList()
+                                val current = _uiState.value
+
+                                _uiState.value = current.copy(
+                                    results = buildDisplayedResults(
+                                        results = snapshot,
+                                        sortMode = current.sortMode,
+                                        filterMode = current.filterMode
+                                    ),
+                                    completedCount = snapshot.size
+                                )
+                            }
+                        }
+
+                    if (symbols == null) {
+                        MarketScanner.scanAll(
+                            policy = policy,
+                            onProgress = progressCallback,
+                            onResult = resultCallback
                         )
                     } else {
                         MarketScanner.scan(
                             symbols = symbols,
                             policy = policy,
-                            onProgress = { completed, total ->
-                                _uiState.value = _uiState.value.copy(
-                                    completedCount = completed,
-                                    totalCount = total
-                                )
-                            }
+                            onProgress = progressCallback,
+                            onResult = resultCallback
                         )
                     }
                 }
@@ -146,8 +172,16 @@ class MarketScannerViewModel : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 if (generation == scanGeneration) {
-                    _uiState.value = _uiState.value.copy(
+                    allResults = streamedResults.toList()
+                    val current = _uiState.value
+
+                    _uiState.value = current.copy(
                         isScanning = false,
+                        results = buildDisplayedResults(
+                            results = allResults,
+                            sortMode = current.sortMode,
+                            filterMode = current.filterMode
+                        ),
                         errorMessage = e.message
                             ?: "اسکن بازار ناموفق بود."
                     )
