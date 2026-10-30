@@ -132,4 +132,44 @@ class BacktestEngineTest {
         assertEquals(ExitReason.END_OF_DATA, result.trades.single().exitReason)
     }
 
+
+    @Test
+    fun shortPositionEntersAtNextOpenAndExitsAtTarget() {
+        val candles = listOf(
+            c(1, 100.0, 101.0, 99.0, 100.0),
+            c(2, 100.0, 101.0, 99.0, 100.0),
+            c(3, 100.0, 101.0, 91.0, 94.0)
+        )
+        val result = BacktestEngine().run(candles, BacktestConfig(
+            initialCapital = 10_000.0, positionNotional = 1_000.0,
+            feeRate = 0.0, slippageRate = 0.0
+        )) { history ->
+            if (history.size == 1) BacktestSignal(TradeDirection.SHORT, 105.0, 92.0) else null
+        }
+
+        assertEquals(1, result.totalTrades)
+        assertEquals(100.0, result.trades.single().entryPrice, 0.000001)
+        assertEquals(92.0, result.trades.single().exitPrice, 0.000001)
+        assertEquals(ExitReason.TAKE_PROFIT, result.trades.single().exitReason)
+        assertTrue(result.trades.single().netPnl > 0.0)
+    }
+
+    @Test
+    fun shortGapThroughStopUsesWorseOpeningPrice() {
+        val candles = listOf(
+            c(1, 100.0, 101.0, 99.0, 100.0),
+            c(2, 110.0, 112.0, 109.0, 111.0)
+        )
+        val result = BacktestEngine().run(candles, BacktestConfig(
+            initialCapital = 10_000.0, positionNotional = 1_000.0,
+            feeRate = 0.0, slippageRate = 0.0
+        )) { history ->
+            if (history.size == 1) BacktestSignal(TradeDirection.SHORT, 105.0, 80.0) else null
+        }
+
+        assertEquals(110.0, result.trades.single().exitPrice, 0.000001)
+        assertEquals(ExitReason.STOP_LOSS, result.trades.single().exitReason)
+        assertTrue(result.trades.single().netPnl < 0.0)
+    }
+
 }
