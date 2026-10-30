@@ -114,7 +114,7 @@ object NobitexTradesApi {
                 ?: throw IOException("Invalid trade entry at index $index")
 
             val time = readLong(item, "time", index)
-            if (time <= 0L || time > Long.MAX_VALUE / 1000L) {
+            if (time <= 0L) {
                 throw IOException("Invalid trade timestamp at index $index")
             }
 
