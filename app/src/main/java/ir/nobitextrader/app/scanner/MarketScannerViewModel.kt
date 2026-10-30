@@ -28,6 +28,7 @@ data class MarketScannerUiState(
     val errorMessage: String? = null,
     val completedCount: Int = 0,
     val totalCount: Int = 0,
+    val failedCount: Int = 0,
     val sortMode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY,
     val filterMode: MarketResultFilterMode = MarketResultFilterMode.ALL,
     val autoRefreshEnabled: Boolean = false,
@@ -113,7 +114,8 @@ class MarketScannerViewModel(
                 results = emptyList(),
                 errorMessage = null,
                 completedCount = 0,
-                totalCount = 0
+                totalCount = 0,
+                failedCount = 0
             )
 
             // This list is written by the scanner's single sequential
@@ -145,7 +147,8 @@ class MarketScannerViewModel(
                                         sortMode = current.sortMode,
                                         filterMode = current.filterMode
                                     ),
-                                    completedCount = snapshot.size
+                                    completedCount = snapshot.size,
+                                    failedCount = snapshot.count { !it.success }
                                 )
                             }
                         }
@@ -180,7 +183,8 @@ class MarketScannerViewModel(
                     ),
                     errorMessage = null,
                     completedCount = results.size,
-                    totalCount = results.size
+                    totalCount = results.size,
+                    failedCount = results.count { !it.success }
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -197,7 +201,8 @@ class MarketScannerViewModel(
                             filterMode = current.filterMode
                         ),
                         errorMessage = e.message
-                            ?: "اسکن بازار ناموفق بود."
+                            ?: "اسکن بازار ناموفق بود.",
+                        failedCount = allResults.count { !it.success }
                     )
                 }
             } finally {
@@ -366,6 +371,7 @@ class MarketScannerViewModel(
             errorMessage = null,
             completedCount = 0,
             totalCount = 0,
+            failedCount = 0,
             analysisBySymbol = emptyMap()
         )
     }
