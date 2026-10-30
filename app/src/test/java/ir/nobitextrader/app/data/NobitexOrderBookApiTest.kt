@@ -115,4 +115,22 @@ class NobitexOrderBookApiTest {
         assertFalse(snapshot.bids.isNotEmpty())
         assertTrue(snapshot.asks.isNotEmpty())
     }
+
+    @Test
+    fun negativeLastUpdateTimestampIsRejected() {
+        assertIOException {
+            snapshot(
+                """{"lastTradePrice":100,"lastUpdate":-1,"bids":[[99,1]],"asks":[[101,1]]}"""
+            )
+        }
+    }
+
+    @Test
+    fun missingLastUpdateTimestampDefaultsToZero() {
+        val result = snapshot(
+            """{"lastTradePrice":100,"bids":[[99,1]],"asks":[[101,1]]}"""
+        )
+
+        assertEquals(0L, result.lastUpdate)
+    }
 }
