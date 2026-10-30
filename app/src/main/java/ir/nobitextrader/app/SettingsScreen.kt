@@ -272,11 +272,21 @@ fun SettingsScreen(
 
             SettingsSection(
                 title = if (english) "MARKET FILTERS" else "فیلترهای بازار",
-                subtitle = if (english) "Limit the scanner workload" else "محدودسازی حجم پردازش اسکنر",
+                subtitle = if (english) "Selected-scan limits and market filters" else "محدودیت اسکن انتخابی و فیلترهای بازار",
                 dark = dark
             ) {
+                Text(
+                    text = if (english) {
+                        "This limit applies only when scanning selected symbols. Full-market scanning continues to retrieve all valid markets returned by Nobitex."
+                    } else {
+                        "این محدودیت فقط هنگام اسکن نمادهای انتخابی اعمال می‌شود. اسکن کامل بازار همچنان همه بازارهای معتبرِ برگشتی از نوبیتکس را دریافت می‌کند."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                SectionDivider()
                 SettingSlider(
-                    title = if (english) "Markets per batch" else "تعداد بازار در هر دسته",
+                    title = if (english) "Maximum symbols in selected scan" else "حداکثر نمادها در اسکن انتخابی",
                     valueLabel = settings.maxMarketsPerBatch.toString(),
                     value = settings.maxMarketsPerBatch.toFloat(),
                     valueRange = 1f..50f,
