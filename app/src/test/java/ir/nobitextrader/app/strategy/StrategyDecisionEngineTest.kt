@@ -178,6 +178,59 @@ class StrategyDecisionEngineTest {
     }
 
     @Test
+    fun mismatchedSignalSymbolProducesNoTrade() {
+        val result = StrategyDecisionEngine().decide(
+            batch(
+                listOf(
+                    signal(StrategyId.FVG),
+                    signal(StrategyId.ORDER_BLOCK).copy(symbol = "ETHIRT")
+                )
+            )
+        )
+
+        assertFalse(result.isActionable)
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertTrue(result.reason.contains("symbol"))
+    }
+
+    @Test
+    fun duplicateStrategyIdsProduceNoTrade() {
+        val result = StrategyDecisionEngine().decide(
+            batch(
+                listOf(
+                    signal(StrategyId.FVG),
+                    signal(StrategyId.FVG)
+                )
+            )
+        )
+
+        assertFalse(result.isActionable)
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertTrue(result.reason.contains("Duplicate"))
+    }
+
+    @Test
+    fun inconsistentBatchCountersProduceNoTrade() {
+        val result = StrategyDecisionEngine().decide(
+            StrategyBatchResult(
+                symbol = "BTCIRT",
+                expectedStrategyCount = 5,
+                attemptedStrategyCount = 3,
+                signals = listOf(
+                    signal(StrategyId.FVG),
+                    signal(StrategyId.ORDER_BLOCK)
+                ),
+                failures = emptyList(),
+                inputError = null
+            )
+        )
+
+        assertFalse(result.isActionable)
+        assertEquals(TradeDirection.FLAT, result.direction)
+        assertTrue(result.reason.contains("count is inconsistent"))
+    }
+
+    @Test
     fun zeroAgreementThresholdIsRejected() {
         try {
             StrategyDecisionEngine(minimumAgreement = 0)
