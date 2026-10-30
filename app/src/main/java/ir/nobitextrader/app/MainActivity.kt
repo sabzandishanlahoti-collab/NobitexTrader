@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -152,13 +153,6 @@ private fun DashboardScreen(
             androidx.compose.material3.AssistChip(
                 onClick = {},
                 label = { Text(if (english) "READ ONLY" else "فقط مشاهده") },
-                leadingIcon = {
-                    androidx.compose.material3.Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Shield,
-                        contentDescription = null,
-                        tint = AfaCyan
-                    )
-                }
             )
         }
 
@@ -278,11 +272,7 @@ private fun DashboardScreen(
                             fontSize = 10.sp
                         )
                     }
-                    androidx.compose.material3.Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Radar,
-                        contentDescription = null,
-                        tint = AfaCyan
-                    )
+                    Text("◎", color = AfaCyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                 }
                 Button(onClick = onOpenScanner, modifier = Modifier.fillMaxWidth()) {
                     Text(if (english) "OPEN MARKET SCANNER  →" else "ورود به صفحه اسکن بازار  ←")
