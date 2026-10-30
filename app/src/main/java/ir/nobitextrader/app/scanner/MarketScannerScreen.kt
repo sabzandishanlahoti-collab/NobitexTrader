@@ -59,7 +59,7 @@ fun MarketScannerScreen(
 
     val visibleResults = state.results
     val successfulCount = visibleResults.count { it.success }
-    val failedCount = visibleResults.count { !it.success }
+    val failedCount = state.failedCount
     val filteredOutCount =
         (state.totalCount - visibleResults.size).coerceAtLeast(0)
 
