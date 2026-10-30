@@ -32,7 +32,7 @@ class MarketResultFilterTest {
             result("FAILED", success = false),
             result("BADPRICE", lastPrice = 0.0),
             result("CROSSED", bestBid = 102.0, bestAsk = 101.0),
-            result("BLANK", symbol = " ")
+            result(symbol = " ")
         )
 
         assertEquals(
