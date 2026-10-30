@@ -111,7 +111,43 @@ class MarketScannerTest {
             result("BADIRT", 0.0, 0.0, 0.0, success = false)
         )
 
-        assertEquals(2, input.count { it.success })
-        assertEquals(1, input.count { !it.success })
+        assertEquals(2, MarketScanner.successfulCount(input))
+        assertEquals(1, MarketScanner.failedCount(input))
     }
+    @Test
+    fun balancedPriorityKeepsSuccessfulResultsAndRanksThemBeforeFailures() {
+        val input = listOf(
+            result("LOWDEPTHIRT", 0.8, 10.0, 10.0),
+            result("BALANCEDIRT", 0.4, 100.0, 100.0),
+            result("WIDESPREADIRT", 2.0, 500.0, 500.0),
+            result("FAILEDIRT", 0.0, 0.0, 0.0, success = false)
+        )
+
+        val sorted = MarketScanner.sortResults(
+            input,
+            MarketSortMode.BALANCED_PRIORITY
+        )
+
+        assertEquals("BALANCEDIRT", sorted.first().symbol)
+        assertFalse(sorted.last().success)
+        assertEquals("FAILEDIRT", sorted.last().symbol)
+        assertEquals(4, sorted.size)
+    }
+
+    @Test
+    fun balancedPriorityHandlesEqualMetricsWithoutDivisionErrors() {
+        val input = listOf(
+            result("BTCIRT", 1.0, 100.0, 100.0),
+            result("ETHIRT", 1.0, 100.0, 100.0)
+        )
+
+        val sorted = MarketScanner.sortResults(
+            input,
+            MarketSortMode.BALANCED_PRIORITY
+        )
+
+        assertEquals(2, sorted.size)
+        assertTrue(sorted.all { it.success })
+    }
+
 }
