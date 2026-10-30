@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -363,12 +363,13 @@ fun MarketScannerScreen(
                 .weight(1f, fill = true),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            items(
+            itemsIndexed(
                 items = visibleResults,
-                key = { "${it.symbol}_${it.success}" }
-            ) { result ->
+                key = { _, result -> "${result.symbol}_${result.success}" }
+            ) { index, result ->
                 MarketResultCard(
                     result = result,
+                    rank = if (result.success) index + 1 else null,
                     analysisState = state.analysisBySymbol[result.symbol],
                     onAnalyze = { viewModel.analyzeMarket(result.symbol) }
                 )
@@ -483,6 +484,7 @@ private fun SortButton(
 @Composable
 private fun MarketResultCard(
     result: MarketScanResult,
+    rank: Int?,
     analysisState: StrategyAnalysisUiState?,
     onAnalyze: () -> Unit
 ) {
@@ -516,12 +518,25 @@ private fun MarketResultCard(
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp
                 )
-                Text(
-                    if (result.success) "داده دریافت شد" else "خطا در دریافت",
-                    color = if (result.success) TerminalGreen else TerminalRed,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (rank != null) {
+                        Text(
+                            "اولویت #$rank",
+                            color = TerminalGreen,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        if (result.success) "داده دریافت شد" else "خطا در دریافت",
+                        color = if (result.success) TerminalGreen else TerminalRed,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
 
             if (!result.success) {
