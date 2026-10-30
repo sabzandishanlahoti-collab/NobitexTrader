@@ -23,6 +23,14 @@ class StrategyDecisionEngine(
             )
         }
 
+        val structuralError = validateBatch(batch)
+        if (structuralError != null) {
+            return noTrade(
+                symbol = batch.symbol,
+                reason = structuralError
+            )
+        }
+
         val actionable = batch.actionableSignals
         val longSignals = actionable.filter { it.direction == TradeDirection.LONG }
         val shortSignals = actionable.filter { it.direction == TradeDirection.SHORT }
@@ -65,6 +73,45 @@ class StrategyDecisionEngine(
             reason = "Confirmed by ${alignedSignals.size} agreeing strategies",
             isActionable = true
         )
+    }
+
+    /**
+     * Defends the decision boundary even when a batch is constructed outside
+     * StrategyOrchestrator (for example by tests, adapters, or future modules).
+     */
+    private fun validateBatch(batch: StrategyBatchResult): String? {
+        if (batch.symbol.isBlank()) return "Market symbol cannot be blank"
+        if (batch.expectedStrategyCount < 1 ||
+            batch.attemptedStrategyCount < 0 ||
+            batch.attemptedStrategyCount > batch.expectedStrategyCount
+        ) {
+            return "Invalid strategy batch counters"
+        }
+
+        if (batch.attemptedStrategyCount !=
+            batch.signals.size + batch.failures.size
+        ) {
+            return "Strategy batch result count is inconsistent"
+        }
+
+        if (batch.signals.any { it.symbol != batch.symbol }) {
+            return "Strategy signal symbol does not match the batch symbol"
+        }
+
+        if (batch.signals.any {
+                !it.confidence.isFinite() || it.confidence !in 0.0..1.0
+            }
+        ) {
+            return "Strategy signal contains invalid confidence"
+        }
+
+        val reportedIds = batch.signals.map { it.strategyId } +
+            batch.failures.map { it.strategyId }
+        if (reportedIds.size != reportedIds.toSet().size) {
+            return "Duplicate strategy result IDs in batch"
+        }
+
+        return null
     }
 
     private fun noTrade(
