@@ -275,3 +275,60 @@ The default coordinator registers five candle-only strategies, in this order:
 - Workflow URL: https://github.com/sabzandishanlahoti-collab/NobitexTrader/actions/runs/41203096162
 - Important limitation: the official Nobitex UDF documentation describes resolutions and response parameters but does not explicitly guarantee that every interval has a candle when no trades occur. Therefore, rejecting every interval gap is currently a conservative implementation assumption, **not yet validated against live UDF behavior**. Before treating this validator as integration-verified, inspect controlled live responses across low-activity markets and confirm whether missing intervals are expected. If legitimate no-trade gaps occur, revise the policy to distinguish missing data from no-trade intervals without silently fabricating candles.
 - Status: **Build/test verified**. Not live API integration verified; not production verified.
+
+
+## 12. Risk subsystem integration audit — source review (2026-10-31)
+
+This is a continuation of the earlier risk audit, performed against the active branch source. No risk behavior or execution code was changed in this audit.
+
+### Exact branch checkpoint used for this review
+- Branch: `afa-mobile-dashboard-review`
+- Branch head checked before this documentation update: `d422fa3e06dbfb7425ec15db799bc06d26c119be`
+- The audit reviewed the branch's RiskEngine, RiskLock, strategy decision/coordinator, scanner ViewModel, public order-book/trades clients, app entry point, settings screen, ViewModel factory, and risk event stores.
+- Keep PR #1 open and do not merge it. Do not commit to `main`.
+
+### Findings: RiskEngine
+- `risk/RiskEngine.kt` is a deterministic standalone evaluator. It validates the supplied account/risk inputs, data-validity and liquidity flags, spread, drawdown, daily loss, free capital, open risk, stop-loss and cost assumptions, then returns a `RiskDecision`.
+- The caller must supply equity, peak equity, day-start equity, free capital, open risk, stop loss, estimated costs, spread, data validity, liquidity sufficiency, and kill-switch state.
+- The engine does not fetch or verify any of those account values itself, does not persist its own state, and does not submit/cancel orders.
+- The source tree contains no verified private-account adapter or order-submission pipeline. Therefore no trustworthy source currently supplies the complete account state required for a live risk approval.
+- The engine's unit tests validate its calculations and rejection rules; they do not prove end-to-end integration.
+
+### Findings: RiskLock
+- `risk/RiskLock.kt` is an in-memory `AtomicReference` lock. It preserves the first lock reason, supports a manual kill switch, requires an explicit boolean confirmation to unlock, and can transform a supplied RiskDecision into a rejection.
+- It does not persist across process death, cancel exchange orders, close positions, or independently inspect exchange/account state.
+- Its KDoc explicitly assigns the caller responsibility to check the lock before every new order.
+- The branch source search/tree review found no production call site invoking `RiskLock.enforce`, `activateKillSwitch`, or `unlockAfterManualReview`. The only confirmed construction/calls are in `RiskLockTest.kt`.
+- Consequently the lock is **implemented and unit-tested, but not integrated into a live or paper order path**. Do not label it an active emergency stop in the app.
+
+### Findings: risk event history
+- `RiskEventStore` is a bounded in-memory store.
+- `PersistentRiskEventStore` is a file-backed bounded store with serialization and guarded replacement/backup behavior.
+- In the reviewed app entry point, Settings screen, and scanner ViewModel factory, no construction or use of either store was found. The scanner ViewModel's visible work is market scanning, public trade-flow loading, and read-only candle strategy analysis.
+- The presence of the persistent store class and its tests does not establish that risk events are currently recorded by the app. Treat risk event history as an available standalone component, not a connected app feature.
+
+### Findings: decision boundary and data sources
+- `StrategyDecisionEngine` converts strategy batch consensus into a `StrategyDecision`; its own KDoc explicitly says it does not manage account risk, access exchange APIs, or place orders.
+- `StrategyAnalysisCoordinator` fetches public candles and runs registered strategies; it is explicitly read-only.
+- `MarketScannerViewModel` exposes scanner results, public trade-flow summaries, and on-demand strategy analysis. No RiskEngine/RiskLock/order-executor integration is present in the reviewed source.
+- `NobitexTradesApi` uses the unauthenticated public recent-trades endpoint. Its model explicitly does not identify the account/person behind a trade.
+- `NobitexOrderBookApi` is a public order-book reader. Neither public data client supplies private account equity, free capital, open positions, or order state.
+
+### Consolidated integration status
+| Component | Status | What is verified |
+|---|---|---|
+| RiskEngine calculations | Build/test verified | Standalone evaluator and safety tests; no account data source or execution caller |
+| RiskLock | Build/test verified | In-memory fail-closed lock and unit tests; no production call site found |
+| Persistent risk event store | Build/test verified as a standalone class | File-backed implementation/tests; not wired into app entry point or scanner ViewModel |
+| Strategy decision | Build/test verified | Strategy consensus only; not risk approval |
+| Private account state | Not implemented / not verified | No authenticated account integration found |
+| Order submission/cancellation | Not implemented / not verified | No verified exchange order pipeline found |
+| Emergency stop affecting exchange | Not implemented / not verified | No cancellation/close-position path; RiskLock not connected |
+
+### Safe next implementation boundary
+Do not wire RiskEngine or RiskLock to placeholder account values, public trade prints, or scanner results. The next valid engineering step for live trading is a separately scoped, official, least-privilege authenticated account integration and a clearly defined order-state/reconciliation interface. Only after that exists should an execution gate be designed to consume verified account state, RiskEngine output, and RiskLock state atomically before every new order, with tests proving rejection prevents submission. Emergency cancellation/position closure must be a separate verified capability; a local lock alone is not an exchange emergency stop.
+
+### Documentation checkpoint
+- This section records source-level findings only; it does not add functionality.
+- The previous verified code milestone remains the RiskEngine safety test expansion, commit `d422fa3e06dbfb7425ec15db799bc06d26c119be`, Actions run #345 (success).
+- Subsequent documentation commit and its Actions result must be recorded after exact-SHA verification.
