@@ -376,7 +376,7 @@ private fun DashboardScreen(
                     .filter { it.value.result != null || it.value.error != null || it.value.isLoading }
                     .take(4)
                 if (analyzedMarkets.isNotEmpty()) {
-                    HorizontalDivider(color = Color(0xFF29404E))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Text(
                         if (english) "STRATEGY ANALYSIS" else "خلاصه تحلیل استراتژی",
                         color = MaterialTheme.colorScheme.primary,
@@ -395,7 +395,7 @@ private fun DashboardScreen(
                             analysisState.isLoading -> MaterialTheme.colorScheme.onSurfaceVariant
                             analysisState.error != null -> AfaColorSchemes.loss
                             decision?.isActionable == true -> AfaColorSchemes.profit
-                            else -> Color(0xFFFFC66D)
+                            else -> AfaColorSchemes.warning
                         }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -587,7 +587,7 @@ private fun SectionPanel(title: String, subtitle: String, empty: String) {
         ) {
             Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
             Text(subtitle, color = MaterialTheme.colorScheme.primary, fontSize = 9.sp)
-            HorizontalDivider(color = Color(0xFF29404E))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Text(empty, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         }
     }
