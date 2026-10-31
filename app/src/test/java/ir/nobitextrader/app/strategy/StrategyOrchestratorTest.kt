@@ -199,12 +199,14 @@ class StrategyOrchestratorTest {
     }
 
     @Test
-    fun emptyStrategyListIsRejectedAtConstruction() {
-        try {
-            StrategyOrchestrator(emptyList())
-            throw AssertionError("Expected empty strategy list to fail")
-        } catch (expected: IllegalArgumentException) {
-            assertTrue(expected.message!!.contains("At least one"))
-        }
+    fun emptyStrategyListProducesValidEmptyBatch() {
+        val result = StrategyOrchestrator(emptyList()).evaluate(context())
+
+        assertTrue(result.isInputValid)
+        assertTrue(result.isComplete)
+        assertEquals(0, result.expectedStrategyCount)
+        assertEquals(0, result.attemptedStrategyCount)
+        assertTrue(result.signals.isEmpty())
+        assertTrue(result.failures.isEmpty())
     }
 }
