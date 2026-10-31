@@ -831,6 +831,33 @@ private fun StrategyAnalysisPanel(
                 fontSize = 11.sp
             )
 
+            analysis.batch?.let { batch ->
+                Text(
+                    "گزارش اجرای استراتژی‌ها: ${batch.attemptedStrategyCount}/${batch.expectedStrategyCount} اجرا • ${batch.failures.size} خطا",
+                    color = if (batch.failures.isEmpty()) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        AfaColorSchemes.warning
+                    },
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                batch.failures.forEach { failure ->
+                    Text(
+                        "خطای ${failure.strategyId.name}: ${failure.message}",
+                        color = AfaColorSchemes.loss,
+                        fontSize = 10.sp
+                    )
+                }
+                if (!batch.isComplete && batch.failures.isEmpty()) {
+                    Text(
+                        "اجرای همهٔ استراتژی‌های ثبت‌شده کامل نشده است.",
+                        color = AfaColorSchemes.warning,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+
             if (!analysis.isFetchSuccessful) {
                 Text(
                     "دریافت داده ناموفق: ${analysis.fetchError}",
