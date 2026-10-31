@@ -357,3 +357,20 @@ Do not wire RiskEngine or RiskLock to placeholder account values, public trade p
   5. Add strategy-driven paper execution only after manual paper ledger is reliable; compare strategies with fees/slippage and walk-forward/backtest metrics. Binance profitability cannot be assumed to transfer to Nobitex/other exchanges.
 - No paper trading, BTC candlestick UI, whale tracker, or bottom navigation has been implemented by this roadmap note. These are planned, not completed.
 - Build run #351 succeeded for code SHA `0c4ed5eae71a1624c4ac53339a3d3921061a312f`; the documentation update itself will trigger a separate workflow and must be checked before claiming it green.
+
+
+## 15. Paper-ledger fee accounting — implementation and verified build (2026-10-31)
+
+- Added a user-configurable paper-trading fee rate in Settings: 0.00%–2.00% per side, stored locally in `TraderSettingsStore`. Default is 0.00%, which intentionally keeps paper BUY/SELL disabled until the user enters the rate applicable to their own account. The setting is not fetched from Nobitex and is not represented as an official fee quote.
+- Connected the configured percentage from `MainActivity` to `PaperTradeScreen`; the screen converts percent to a fractional rate before calling the paper ledger.
+- `PaperTradingStore.execute` validates the fee rate and includes fees in the accounting:
+  - BUY: deducts notional plus fee from virtual cash and capitalizes the buy fee into the position's weighted average cost.
+  - SELL: credits notional less fee to virtual cash and deducts the sell fee from realized P/L.
+  - Per-trade fee amount is persisted with the trade record; cumulative realized P/L remains separately persisted and is net of recorded sell fees plus buy fees carried in average cost.
+- Paper screen shows the configured per-side fee and estimates unrealized P/L after the estimated exit fee, while buy/sell remain disabled if fee rate is unset or market price is stale.
+- History now labels cumulative realized P/L as net of recorded fees and shows each trade's fee. Legacy trades recorded before fee tracking are not retroactively adjusted; historical fee/P&L data cannot be reconstructed.
+- Intermediate Actions runs #370 and #371 failed due to missing fee arguments in the paper-screen/store call sites. Those compile errors were corrected in subsequent commits; runs #372, #373, #374, and exact-head run #375 passed.
+- Verified branch-head commit: `3e60fc8b8e4bc50666b1232c0ec275efc7b539db`.
+- Exact-SHA workflow: Android APK Build and Tests, run #375 — **success**.
+- Workflow URL: https://github.com/sabzandishanlahoti-collab/NobitexTrader/actions/runs/41217986631
+- Scope: paper-ledger accounting and Android build/unit-test verification. It does not verify the user's actual Nobitex fee tier, live exchange execution, or trading profitability.
