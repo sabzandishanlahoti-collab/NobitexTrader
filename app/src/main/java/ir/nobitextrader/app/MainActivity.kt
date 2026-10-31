@@ -526,8 +526,19 @@ private fun MetricCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1)
-            Text(value, color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 23.sp)
+            Text(
+                title,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 2
+            )
+            Text(
+                value,
+                color = accent,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1
+            )
         }
     }
 }
@@ -555,20 +566,22 @@ private fun TransferMetricCard(
             Text(
                 title,
                 color = accent,
-                fontSize = 11.sp,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1
+                maxLines = 2
             )
             Text(
                 value,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 21.sp,
-                fontWeight = FontWeight.ExtraBold
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1
             )
             Text(
                 caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2
             )
         }
     }
@@ -586,10 +599,10 @@ private fun SectionPanel(title: String, subtitle: String, empty: String) {
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
+            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Text(empty, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            Text(empty, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
