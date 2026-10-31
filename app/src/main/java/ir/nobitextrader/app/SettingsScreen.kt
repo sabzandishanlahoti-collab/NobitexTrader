@@ -340,8 +340,8 @@ private fun SettingsSection(
         tonalElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(13.dp)
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(

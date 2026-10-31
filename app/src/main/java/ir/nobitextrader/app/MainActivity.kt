@@ -94,8 +94,8 @@ private fun AfaBrandHeader() {
         Spacer(modifier = Modifier.width(5.dp))
         Text(
             text = "NOBITEX TRADER  A.F.A SNIPER",
-            maxLines = 1,
-            softWrap = false,
+            maxLines = 2,
+            softWrap = true,
             fontSize = 14.sp,
             letterSpacing = (-0.45).sp,
             fontWeight = FontWeight.ExtraBold,
@@ -238,7 +238,7 @@ private fun DashboardScreen(
                             if (english) "NOT CONNECTED" else "اتصال اجرا برقرار نیست",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -263,7 +263,7 @@ private fun DashboardScreen(
                 Text(
                     if (english) "Controls unlock only after verified private API, order state and emergency-close tests." else "این کلیدها پس از تکمیل و آزمایش API خصوصی، وضعیت سفارش‌ها و توقف اضطراری فعال می‌شوند.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 10.sp
+                    fontSize = 11.sp
                 )
             }
         }
@@ -292,7 +292,7 @@ private fun DashboardScreen(
                         Text(
                             if (english) "Independent full-screen scanner" else "اسکنر مستقل در صفحه تمام‌صفحه",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 10.sp
+                            fontSize = 11.sp
                         )
                     }
                     Text("◎", color = MaterialTheme.colorScheme.primary, fontSize = 25.sp, fontWeight = FontWeight.Bold)
@@ -410,7 +410,7 @@ private fun DashboardScreen(
                             Text(
                                 status,
                                 color = statusColor,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -421,14 +421,14 @@ private fun DashboardScreen(
                                     " • " +
                                     String.format(Locale.US, "%.1f%%", decision.confidence * 100.0),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 9.sp
+                                fontSize = 11.sp
                             )
                         }
                     }
                     Text(
                         if (english) "Analysis signals only — no order has been placed." else "این‌ها فقط خروجی تحلیل هستند؛ هیچ سفارشی ثبت نشده است.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 9.sp
+                        fontSize = 11.sp
                     )
                 }
             }
@@ -455,7 +455,7 @@ private fun DashboardScreen(
                         fontWeight = FontWeight.Bold
                     )
                     OutlinedButton(onClick = onRefreshMarket, enabled = !marketLoading) {
-                        Text(if (marketLoading) "…" else if (english) "REFRESH" else "بروزرسانی", fontSize = 10.sp)
+                        Text(if (marketLoading) "…" else if (english) "REFRESH" else "بروزرسانی", fontSize = 11.sp)
                     }
                 }
                 if (marketResult == null) {
@@ -504,7 +504,7 @@ private fun DashboardScreen(
         Text(
             if (english) "Account balance, profit and trade history require verified authenticated exchange data." else "موجودی حساب، سود و تاریخچه معاملات به داده احراز هویت‌شده و تأییدشده صرافی نیاز دارند.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 10.sp
+            fontSize = 11.sp
         )
     }
 }
@@ -526,7 +526,7 @@ private fun MetricCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, maxLines = 1)
+            Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, maxLines = 1)
             Text(value, color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 23.sp)
         }
     }
@@ -568,7 +568,7 @@ private fun TransferMetricCard(
             Text(
                 caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 9.sp
+                fontSize = 11.sp
             )
         }
     }
@@ -587,7 +587,7 @@ private fun SectionPanel(title: String, subtitle: String, empty: String) {
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = MaterialTheme.colorScheme.primary, fontSize = 9.sp)
+            Text(subtitle, color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Text(empty, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         }

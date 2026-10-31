@@ -78,7 +78,7 @@ fun MarketScannerScreen(
                 Text(
                     text = "NOBITEX TERMINAL",
                     color = MaterialTheme.colorScheme.primary,
-                    fontSize = 17.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.2.sp
                 )
@@ -111,7 +111,7 @@ fun MarketScannerScreen(
                 Text(
                     text = "REST SNAPSHOT",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 9.sp,
+                    fontSize = 11.sp,
                     letterSpacing = 0.8.sp
                 )
             }
@@ -222,7 +222,7 @@ fun MarketScannerScreen(
             "این ارقام نقدینگی ۵ ردیف اول دفتر سفارش بازارهای موفقِ قابل‌نمایش هستند؛ " +
                 "نه تعداد معاملات انجام‌شده، نه ورود/خروج قطعی سرمایه و نه سود حساب.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 10.sp
+            fontSize = 11.sp
         )
 
         Card(
@@ -466,7 +466,7 @@ private fun MetricPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+        Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         Text(
             value,
             color = valueColor,
@@ -604,14 +604,14 @@ private fun MarketResultCard(
                         Text(
                             "اولویت #$rank",
                             color = MaterialTheme.colorScheme.primary,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Text(
                         if (result.success) "داده دریافت شد" else "خطا در دریافت",
                         color = if (result.success) MaterialTheme.colorScheme.primary else AfaColorSchemes.loss,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -635,7 +635,7 @@ private fun MarketResultCard(
                 Text(
                     rankingBasis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 10.sp
+                    fontSize = 11.sp
                 )
             }
 
@@ -698,7 +698,7 @@ private fun MarketResultCard(
                 Text(
                     "سهم عمق خرید از مجموع ۱۰ سطح برتر دفتر سفارش؛ شاخص فشار سفارش است، نه پیش‌بینی قطعی قیمت.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 9.sp
+                    fontSize = 11.sp
                 )
 
                 OutlinedButton(
@@ -714,7 +714,7 @@ private fun MarketResultCard(
                     Text(if (tradeLoading) "دریافت معاملات عمومی..." else "بررسی معاملات انجام‌شده")
                 }
                 tradeError?.let {
-                    Text("خطای معاملات: $it", color = AfaColorSchemes.loss, fontSize = 10.sp)
+                    Text("خطای معاملات: $it", color = AfaColorSchemes.loss, fontSize = 11.sp)
                 }
                 tradeFlow?.let { flow ->
                     Column(
@@ -739,17 +739,17 @@ private fun MarketResultCard(
                             flow.latestTradeTimeMillis?.let { "زمان آخرین معامله: " +
                                 java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(java.util.Date(it)) }
                                 ?: "معامله‌ای در پاسخ اخیر موجود نبود",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp
                         )
                         Text(
                             "زمان دریافت داده: " +
                                 java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                                     .format(java.util.Date(flow.fetchedAtMillis)) +
                                 " • برای تازه‌سازی دوباره دکمه دریافت را بزنید",
-                            color = AfaColorSchemes.warning, fontSize = 9.sp
+                            color = AfaColorSchemes.warning, fontSize = 11.sp
                         )
                         Text("نمونه معاملات اخیر API عمومی؛ نه کل معاملات روز و نه سود حساب شخصی.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                     }
                 }
 
@@ -873,7 +873,7 @@ private fun StrategyAnalysisPanel(
         Text(
             "فقط تحلیل و سیگنال؛ هیچ سفارش یا معامله‌ای ثبت نمی‌شود.",
             color = AfaColorSchemes.warning,
-            fontSize = 10.sp
+            fontSize = 11.sp
         )
     }
 }
@@ -887,7 +887,7 @@ private fun DataValue(
         modifier = Modifier.padding(vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         Text(
             value,
             color = MaterialTheme.colorScheme.onSurface,
