@@ -46,6 +46,7 @@ fun PaperTradingScreen(
     var quoteAmount by remember { mutableStateOf("10000000") }
     var sellQuantity by remember { mutableStateOf("") }
     var orderBook by remember { mutableStateOf<OrderBookSnapshot?>(null) }
+    var bidPrices by remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
@@ -61,10 +62,23 @@ fun PaperTradingScreen(
             error = null
             info = null
             try {
-                val result = withContext(Dispatchers.IO) {
-                    NobitexOrderBookApi.fetch(requestedSymbol)
+                val refreshed = withContext(Dispatchers.IO) {
+                    val allBooks = if (account.positions.isNotEmpty()) {
+                        runCatching { NobitexOrderBookApi.fetchAll() }.getOrDefault(emptyList())
+                    } else {
+                        emptyList()
+                    }
+                    val selected = allBooks.firstOrNull { it.symbol == requestedSymbol }
+                        ?: NobitexOrderBookApi.fetch(requestedSymbol)
+                    val prices = allBooks.mapNotNull { book ->
+                        book.bestBid?.let { book.symbol to it }
+                    }.toMap().toMutableMap()
+                    selected.bestBid?.let { prices[selected.symbol] = it }
+                    selected to prices.toMap()
                 }
+                val result = refreshed.first
                 orderBook = result
+                bidPrices = refreshed.second
                 symbol = result.symbol
                 info = if (english) "Live order book updated" else "دفتر سفارش زنده به‌روزرسانی شد"
             } catch (e: Exception) {
@@ -80,13 +94,8 @@ fun PaperTradingScreen(
         PaperAccountStore.save(context, next)
     }
 
-    val portfolio = remember(account, orderBook) {
-        val bid = orderBook?.bestBid
-        if (bid != null) {
-            PaperTradingEngine.value(account, mapOf(orderBook!!.symbol to bid))
-        } else {
-            PaperTradingEngine.value(account, emptyMap())
-        }
+    val portfolio = remember(account, bidPrices) {
+        PaperTradingEngine.value(account, bidPrices)
     }
 
     LaunchedEffect(Unit) { refreshMarket() }
@@ -114,6 +123,14 @@ fun PaperTradingScreen(
                 Text((if (english) "Available cash: " else "موجودی نقد: ") + money(account.cash))
                 Text((if (english) "Open positions value: " else "ارزش دارایی باز: ") + money(portfolio.positionsValue))
                 Text((if (english) "Total equity: " else "ارزش کل حساب: ") + money(portfolio.totalEquity))
+                if (portfolio.unpricedPositionCount > 0) {
+                    Text(
+                        if (english) "Unpriced open positions: ${portfolio.unpricedPositionCount} — valuation is partial"
+                        else "دارایی بدون قیمت زنده: ${portfolio.unpricedPositionCount} — ارزش کل فعلاً ناقص است",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 Text((if (english) "Realized P/L: " else "سود و زیان قطعی: ") + money(account.realizedPnl))
                 Text((if (english) "Unrealized P/L (estimated): " else "سود و زیان شناور (تخمینی): ") + money(portfolio.unrealizedPnl))
                 Text(
