@@ -123,6 +123,11 @@ object NobitexTradesApi {
             if (price <= 0.0 || volume < 0.0) {
                 throw IOException("Non-positive price or negative volume at index $index")
             }
+            // Reject values whose quote notional overflows Double. Otherwise an
+            // infinite amount can contaminate public-flow summaries and rankings.
+            if (!(price * volume).isFinite()) {
+                throw IOException("Trade quote volume is non-finite at index $index")
+            }
 
             val side = when (item.optString("type").lowercase(Locale.ROOT)) {
                 "buy" -> TradeSide.BUY

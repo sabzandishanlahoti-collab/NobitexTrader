@@ -8,7 +8,6 @@ class StrategyOrchestrator(strategies: List<TradingStrategy>) {
     private val strategies = strategies.toList()
 
     init {
-        require(this.strategies.isNotEmpty()) { "At least one trading strategy is required" }
         val duplicates = this.strategies.groupingBy { it.id }
             .eachCount().filterValues { it > 1 }.keys
         require(duplicates.isEmpty()) { "Duplicate strategy IDs: ${duplicates.joinToString()}" }

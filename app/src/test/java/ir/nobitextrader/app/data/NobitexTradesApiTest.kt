@@ -1,7 +1,5 @@
 package ir.nobitextrader.app.data
 
-import org.json.JSONArray
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -48,6 +46,26 @@ class NobitexTradesApiTest {
                 """{"status":"ok","trades":[{"time":1,"price":0,"volume":1,"type":"buy"}]}"""
             )
         }
+    }
+
+    @Test
+    fun rejectsQuoteVolumeOverflow() {
+        assertIOException {
+            NobitexTradesApi.parseResponse(
+                """{"status":"ok","trades":[{"time":1,"price":"1e308","volume":"1e308","type":"buy"}]}"""
+            )
+        }
+    }
+
+    @Test
+    fun acceptsLargeButFiniteQuoteVolume() {
+        val result = NobitexTradesApi.parseResponse(
+            """{"status":"ok","trades":[{"time":1,"price":"1e200","volume":"1e100","type":"buy"}]}"""
+        )
+
+        assertEquals(1, result.size)
+        assertTrue(result.single().quoteVolume.isFinite())
+        assertEquals(1e300, result.single().quoteVolume, 1e285)
     }
 
     @Test

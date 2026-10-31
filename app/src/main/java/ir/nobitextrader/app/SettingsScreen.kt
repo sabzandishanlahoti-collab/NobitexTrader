@@ -24,8 +24,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,13 +38,6 @@ import java.util.Locale
 
 private const val SETTINGS_PREFS = "nobitex_trader_settings"
 
-private val AccentGreen = Color(0xFF35DDE0)
-private val AccentGreenDark = Color(0xFF087E88)
-private val DarkBackground = Color(0xFF070D18)
-private val DarkSurface = Color(0xFF101B2B)
-private val DarkSurfaceAlt = Color(0xFF19283A)
-private val LightBackground = Color(0xFFF3FAFB)
-private val LightSurface = Color(0xFFFFFFFF)
 
 data class TraderSettings(
     val useEnglish: Boolean = false,
@@ -56,7 +46,14 @@ data class TraderSettings(
     val refreshSeconds: Int = 30,
     val requestTimeoutSeconds: Int = 10,
     val maxMarketsPerBatch: Int = 10,
-    val maxSpreadPercent: Float = 1f
+    val maxSpreadPercent: Float = 1f,
+    val paperFeePercent: Float = 0f,
+    val strategyFmcEnabled: Boolean = true,
+    val strategyFvgEnabled: Boolean = true,
+    val strategyLiquiditySweepEnabled: Boolean = true,
+    val strategyOrderBlockEnabled: Boolean = true,
+    val strategyMicroScalperEnabled: Boolean = true,
+    val minimumStrategyAgreement: Int = 2
 )
 
 object TraderSettingsStore {
@@ -72,7 +69,14 @@ object TraderSettingsStore {
             refreshSeconds = p.getInt("refresh_seconds", 30).coerceIn(5, 3600),
             requestTimeoutSeconds = p.getInt("timeout_seconds", 10).coerceIn(1, 60),
             maxMarketsPerBatch = p.getInt("markets_per_batch", 10).coerceIn(1, 50),
-            maxSpreadPercent = p.getFloat("max_spread_percent", 1f).coerceIn(0.1f, 10f)
+            maxSpreadPercent = p.getFloat("max_spread_percent", 1f).coerceIn(0.1f, 10f),
+            paperFeePercent = p.getFloat("paper_fee_percent", 0f).coerceIn(0f, 2f),
+            strategyFmcEnabled = p.getBoolean("strategy_fmc_enabled", true),
+            strategyFvgEnabled = p.getBoolean("strategy_fvg_enabled", true),
+            strategyLiquiditySweepEnabled = p.getBoolean("strategy_liquidity_sweep_enabled", true),
+            strategyOrderBlockEnabled = p.getBoolean("strategy_order_block_enabled", true),
+            strategyMicroScalperEnabled = p.getBoolean("strategy_micro_scalper_enabled", true),
+            minimumStrategyAgreement = p.getInt("minimum_strategy_agreement", 2).coerceIn(1, 5)
         )
     }
 
@@ -85,6 +89,13 @@ object TraderSettingsStore {
             .putInt("timeout_seconds", settings.requestTimeoutSeconds.coerceIn(1, 60))
             .putInt("markets_per_batch", settings.maxMarketsPerBatch.coerceIn(1, 50))
             .putFloat("max_spread_percent", settings.maxSpreadPercent.coerceIn(0.1f, 10f))
+            .putFloat("paper_fee_percent", settings.paperFeePercent.coerceIn(0f, 2f))
+            .putBoolean("strategy_fmc_enabled", settings.strategyFmcEnabled)
+            .putBoolean("strategy_fvg_enabled", settings.strategyFvgEnabled)
+            .putBoolean("strategy_liquidity_sweep_enabled", settings.strategyLiquiditySweepEnabled)
+            .putBoolean("strategy_order_block_enabled", settings.strategyOrderBlockEnabled)
+            .putBoolean("strategy_micro_scalper_enabled", settings.strategyMicroScalperEnabled)
+            .putInt("minimum_strategy_agreement", settings.minimumStrategyAgreement.coerceIn(1, 5))
             .apply()
     }
 
@@ -110,35 +121,9 @@ fun SettingsScreen(
 
     val english = settings.useEnglish
     val dark = settings.darkTheme
-    val scheme = if (dark) {
-        darkColorScheme(
-            primary = AccentGreen,
-            onPrimary = Color(0xFF07110C),
-            secondary = Color(0xFF8CECEF),
-            background = DarkBackground,
-            surface = DarkSurface,
-            surfaceVariant = DarkSurfaceAlt,
-            onBackground = Color(0xFFEAFBFC),
-            onSurface = Color(0xFFEAFBFC),
-            onSurfaceVariant = Color(0xFFA9C2CC),
-            outline = Color(0xFF31515A)
-        )
-    } else {
-        lightColorScheme(
-            primary = AccentGreenDark,
-            onPrimary = Color.White,
-            secondary = AccentGreen,
-            background = LightBackground,
-            surface = LightSurface,
-            surfaceVariant = Color(0xFFE1F2F3),
-            onBackground = Color(0xFF102329),
-            onSurface = Color(0xFF102329),
-            onSurfaceVariant = Color(0xFF526B72),
-            outline = Color(0xFFC9E0E2)
-        )
-    }
+    val scheme = AfaColorSchemes.create(dark)
 
-    MaterialTheme(colorScheme = scheme) {
+    MaterialTheme(colorScheme = scheme, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes) {
         Column(
             modifier = modifier
                 .fillMaxSize()
@@ -313,6 +298,119 @@ fun SettingsScreen(
             }
 
             SettingsSection(
+                title = if (english) "STRATEGY CONTROL" else "کنترل استراتژی‌ها",
+                subtitle = if (english) "Enable or disable each strategy independently" else "هر استراتژی را مستقل روشن یا خاموش کن",
+                dark = dark
+            ) {
+                SettingSwitch(
+                    title = if (english) "FMC" else "استراتژی FMC",
+                    description = if (english) "FMC candle setup evaluation" else "بررسی الگوی کندلی FMC",
+                    checked = settings.strategyFmcEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyFmcEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSwitch(
+                    title = if (english) "FVG" else "استراتژی FVG",
+                    description = if (english) "Fair Value Gap setup evaluation" else "بررسی ناحیه عدم تعادل قیمت",
+                    checked = settings.strategyFvgEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyFvgEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSwitch(
+                    title = if (english) "Liquidity Sweep" else "جمع‌آوری نقدینگی",
+                    description = if (english) "Liquidity sweep setup evaluation" else "بررسی شکار حدضرر و نقدینگی",
+                    checked = settings.strategyLiquiditySweepEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyLiquiditySweepEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSwitch(
+                    title = if (english) "Order Block" else "اوردر بلاک",
+                    description = if (english) "Order block setup evaluation" else "بررسی نواحی سفارش",
+                    checked = settings.strategyOrderBlockEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyOrderBlockEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSwitch(
+                    title = if (english) "Micro Scalper" else "میکرو اسکالپر",
+                    description = if (english) "Short-term candle setup evaluation" else "بررسی موقعیت‌های کوتاه‌مدت",
+                    checked = settings.strategyMicroScalperEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyMicroScalperEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSlider(
+                    title = if (english) "Minimum agreeing strategies" else "حداقل استراتژی‌های هم‌نظر",
+                    valueLabel = settings.minimumStrategyAgreement.toString(),
+                    value = settings.minimumStrategyAgreement.toFloat(),
+                    valueRange = 1f..5f,
+                    steps = 3,
+                    onValueChange = {
+                        updateSettings(settings.copy(minimumStrategyAgreement = it.toInt().coerceIn(1, 5)))
+                    }
+                )
+                Text(
+                    text = if (english) {
+                        "Only enabled strategies are evaluated. If all are disabled, the analysis reports that no strategy is active. Lower agreement can increase signals and risk."
+                    } else {
+                        "فقط استراتژی‌های روشن بررسی می‌شوند. اگر همه خاموش باشند، تحلیل علت را اعلام می‌کند. کاهش حدنصاب می‌تواند تعداد سیگنال‌ها و ریسک را افزایش دهد."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            SettingsSection(
+                title = if (english) "PAPER TRADING COSTS" else "هزینه‌های معاملات مجازی",
+                subtitle = if (english) "Set the fee rate from your current exchange fee tier" else "نرخ کارمزد را مطابق سطح کارمزدی فعلی حسابت وارد کن",
+                dark = dark
+            ) {
+                SettingSlider(
+                    title = if (english) "Fee per side" else "کارمزد هر سمت معامله",
+                    valueLabel = String.format(Locale.US, "%.2f%%", settings.paperFeePercent),
+                    value = settings.paperFeePercent,
+                    valueRange = 0f..2f,
+                    steps = 199,
+                    onValueChange = {
+                        updateSettings(settings.copy(paperFeePercent = it.coerceIn(0f, 2f)))
+                    }
+                )
+                Text(
+                    if (settings.paperFeePercent <= 0f) {
+                        if (english) "Fee is not configured. Paper BUY/SELL will remain locked." else "کارمزد تنظیم نشده؛ خرید و فروش مجازی قفل می‌ماند."
+                    } else {
+                        if (english) "Applied to both BUY and SELL notional. Enter the rate shown for your account; this is not fetched from Nobitex." else "این نرخ هم برای خرید و هم فروش اعمال می‌شود. نرخ حساب خودت را وارد کن؛ برنامه آن را از نوبیتکس دریافت نمی‌کند."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            SettingsSection(
+                title = if (english) "PAPER TRADING COSTS" else "هزینه‌های معاملات مجازی",
+                subtitle = if (english) "Configure the local paper-ledger fee" else "تنظیم کارمزد دفتر معاملات مجازی",
+                dark = dark
+            ) {
+                SettingSlider(
+                    title = if (english) "Fee per side" else "کارمزد هر سمت معامله",
+                    valueLabel = String.format(Locale.US, "%.2f%%", settings.paperFeePercent),
+                    value = settings.paperFeePercent,
+                    valueRange = 0f..2f,
+                    steps = 199,
+                    onValueChange = {
+                        updateSettings(settings.copy(paperFeePercent = it.coerceIn(0f, 2f)))
+                    }
+                )
+                Text(
+                    text = if (english) {
+                        "Applied separately to every buy and sell. Default is 0% until you set the rate for your account. This is a simulation setting, not a verified Nobitex fee quote."
+                    } else {
+                        "برای هر خرید و فروش جداگانه اعمال می‌شود. پیش‌فرض صفر است تا نرخ مربوط به حساب خودت را تعیین کنی. این تنظیم شبیه‌سازی است و نرخ قطعی کارمزد نوبیتکس نیست."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            SettingsSection(
                 title = if (english) "LOCAL STORAGE" else "ذخیره‌سازی و بازنشانی",
                 subtitle = if (english) "Preferences are stored on this device" else "تنظیمات فعلی روی همین دستگاه ذخیره می‌شوند",
                 dark = dark
@@ -344,8 +442,8 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentGreenDark,
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text(
@@ -368,16 +466,16 @@ private fun SettingsSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = if (dark) DarkSurface else LightSurface,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             1.dp,
-            if (dark) Color(0xFF24414A) else Color(0xFFE0E7E1)
+            MaterialTheme.colorScheme.outline
         ),
         tonalElevation = 1.dp
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(13.dp)
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
@@ -389,7 +487,8 @@ private fun SettingsSection(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
                 )
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
@@ -429,12 +528,12 @@ private fun SettingSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color(0xFFE8FCFC),
-                checkedTrackColor = AccentGreenDark,
-                checkedBorderColor = AccentGreen,
-                uncheckedThumbColor = Color(0xFFB6C9CC),
-                uncheckedTrackColor = Color(0xFF263E46),
-                uncheckedBorderColor = Color(0xFF5C7B82)
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                checkedBorderColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                uncheckedBorderColor = MaterialTheme.colorScheme.outline
             )
         )
     }
@@ -473,10 +572,10 @@ private fun SettingSlider(
             valueRange = valueRange,
             steps = steps,
             colors = SliderDefaults.colors(
-                thumbColor = AccentGreen,
-                activeTrackColor = AccentGreenDark,
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
                 inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
-                activeTickColor = Color(0xFFB7F4F4),
+                activeTickColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 inactiveTickColor = MaterialTheme.colorScheme.outline
             )
         )
@@ -490,13 +589,13 @@ private fun StatusTag(
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = if (dark) Color(0xFF16343B) else Color(0xFFE5EEE7)
+        color = MaterialTheme.colorScheme.tertiaryContainer
     ) {
         Text(
             text = text,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelSmall,
-            color = if (dark) Color(0xFFB7F4F4) else AccentGreenDark,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
             fontWeight = FontWeight.Bold
         )
     }

@@ -1,8 +1,11 @@
-
 name: Android APK Build and Tests
 
 on:
   push:
+    branches:
+      - main
+      - afa-mobile-dashboard-review
+  pull_request:
     branches:
       - main
   workflow_dispatch:

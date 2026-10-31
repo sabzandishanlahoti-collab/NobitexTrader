@@ -8,6 +8,7 @@ import ir.nobitextrader.app.data.PublicTrade
 import ir.nobitextrader.app.data.TradeSide
 import ir.nobitextrader.app.strategy.StrategyAnalysisCoordinator
 import ir.nobitextrader.app.strategy.StrategyAnalysisResult
+import ir.nobitextrader.app.strategy.StrategyId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,18 +26,62 @@ data class PublicTradeFlowSummary(
     val buyQuoteVolume: Double,
     val sellQuoteVolume: Double,
     val netQuoteFlow: Double,
-    val latestTradeTimeMillis: Long?
+    val latestTradeTimeMillis: Long?,
+    val fetchedAtMillis: Long
 ) {
     companion object {
-        fun from(trades: List<PublicTrade>): PublicTradeFlowSummary = PublicTradeFlowSummary(
-            buyCount = trades.count { it.type == TradeSide.BUY },
-            sellCount = trades.count { it.type == TradeSide.SELL },
-            buyQuoteVolume = trades.filter { it.type == TradeSide.BUY }.sumOf { it.quoteVolume },
-            sellQuoteVolume = trades.filter { it.type == TradeSide.SELL }.sumOf { it.quoteVolume },
-            netQuoteFlow = trades.filter { it.type == TradeSide.BUY }.sumOf { it.quoteVolume } -
-                trades.filter { it.type == TradeSide.SELL }.sumOf { it.quoteVolume },
-            latestTradeTimeMillis = trades.maxOfOrNull { it.timeMillis }
-        )
+        fun from(
+            trades: List<PublicTrade>,
+            fetchedAtMillis: Long = System.currentTimeMillis()
+        ): PublicTradeFlowSummary {
+            require(fetchedAtMillis > 0L) {
+                "Fetch timestamp must be positive"
+            }
+            trades.forEachIndexed { index, trade ->
+                require(trade.timeMillis > 0L) {
+                    "Public trade timestamp must be positive at index $index"
+                }
+                require(trade.price.isFinite() && trade.price > 0.0) {
+                    "Public trade price must be finite and positive at index $index"
+                }
+                require(trade.volume.isFinite() && trade.volume >= 0.0) {
+                    "Public trade volume must be finite and non-negative at index $index"
+                }
+                require(trade.quoteVolume.isFinite() && trade.quoteVolume >= 0.0) {
+                    "Public trade quote volume must be finite and non-negative at index $index"
+                }
+            }
+
+            val buys = trades.filter { it.type == TradeSide.BUY }
+            val sells = trades.filter { it.type == TradeSide.SELL }
+            val buyVolume = sumFiniteQuoteVolume(buys)
+            val sellVolume = sumFiniteQuoteVolume(sells)
+            val netFlow = buyVolume - sellVolume
+
+            require(netFlow.isFinite()) {
+                "Public trade net quote flow is non-finite"
+            }
+
+            return PublicTradeFlowSummary(
+                buyCount = buys.size,
+                sellCount = sells.size,
+                buyQuoteVolume = buyVolume,
+                sellQuoteVolume = sellVolume,
+                netQuoteFlow = netFlow,
+                latestTradeTimeMillis = trades.maxOfOrNull { it.timeMillis },
+                fetchedAtMillis = fetchedAtMillis
+            )
+        }
+
+        private fun sumFiniteQuoteVolume(trades: List<PublicTrade>): Double {
+            return trades.fold(0.0) { total, trade ->
+                val next = total + trade.quoteVolume
+                require(next.isFinite()) {
+                    "Public trade quote volume total is non-finite"
+                }
+                next
+            }
+        }
     }
 }
 
@@ -49,6 +94,8 @@ data class StrategyAnalysisUiState(
 data class MarketScannerUiState(
     val isScanning: Boolean = false,
     val results: List<MarketScanResult> = emptyList(),
+    // Unfiltered source results keep the dashboard independent from scanner UI filters.
+    val rawResults: List<MarketScanResult> = emptyList(),
     val errorMessage: String? = null,
     val completedCount: Int = 0,
     val totalCount: Int = 0,
@@ -86,6 +133,8 @@ class MarketScannerViewModel(
         MarketRefreshPolicy.DEFAULT.maxMarketsPerBatch
 
     private var maxSpreadPercent = 1f
+    private var enabledStrategyIds: Set<StrategyId> = StrategyAnalysisCoordinator.defaultStrategies().map { it.id }.toSet()
+    private var minimumStrategyAgreement: Int = 2
 
     fun applySettings(settings: TraderSettings) {
         requestTimeoutMs =
@@ -96,6 +145,14 @@ class MarketScannerViewModel(
 
         maxSpreadPercent =
             settings.maxSpreadPercent.coerceIn(0.1f, 10f)
+        enabledStrategyIds = buildSet {
+            if (settings.strategyFmcEnabled) add(StrategyId.FMC)
+            if (settings.strategyFvgEnabled) add(StrategyId.FVG)
+            if (settings.strategyLiquiditySweepEnabled) add(StrategyId.LIQUIDITY_SWEEP)
+            if (settings.strategyOrderBlockEnabled) add(StrategyId.ORDER_BLOCK)
+            if (settings.strategyMicroScalperEnabled) add(StrategyId.MICRO_SCALPER)
+        }
+        minimumStrategyAgreement = settings.minimumStrategyAgreement.coerceIn(1, 5)
 
         val refreshMs =
             settings.refreshSeconds.coerceIn(5, 3600) * 1_000L
@@ -141,6 +198,7 @@ class MarketScannerViewModel(
             _uiState.value = _uiState.value.copy(
                 isScanning = true,
                 results = emptyList(),
+                rawResults = emptyList(),
                 errorMessage = null,
                 completedCount = 0,
                 totalCount = 0,
@@ -178,6 +236,7 @@ class MarketScannerViewModel(
                                         sortMode = current.sortMode,
                                         filterMode = current.filterMode
                                     ),
+                                    rawResults = snapshot,
                                     completedCount = snapshot.size,
                                     successfulCount = snapshot.count { it.success },
                                     failedCount = snapshot.count { !it.success }
@@ -213,6 +272,7 @@ class MarketScannerViewModel(
                         sortMode = current.sortMode,
                         filterMode = current.filterMode
                     ),
+                    rawResults = allResults,
                     errorMessage = null,
                     completedCount = results.size,
                     totalCount = results.size,
@@ -233,6 +293,7 @@ class MarketScannerViewModel(
                             sortMode = current.sortMode,
                             filterMode = current.filterMode
                         ),
+                        rawResults = allResults,
                         errorMessage = e.message
                             ?: "اسکن بازار ناموفق بود.",
                         successfulCount = allResults.count { it.success },
@@ -255,12 +316,11 @@ class MarketScannerViewModel(
         sortMode: MarketSortMode,
         filterMode: MarketResultFilterMode
     ): List<MarketScanResult> {
-        val spreadFiltered = results.filter {
-            !it.success || it.spreadPercent <= maxSpreadPercent
-        }
-
+        // Keep every successfully scanned symbol visible by default.
+        // Spread thresholds must not silently hide valid market books.
+        // Users can still apply an explicit result filter from the scanner UI.
         return MarketResultFilter.apply(
-            MarketScanner.sortResults(spreadFiltered, sortMode, _uiState.value.tradeFlowBySymbol),
+            MarketScanner.sortResults(results, sortMode, _uiState.value.tradeFlowBySymbol),
             filterMode
         )
     }
@@ -311,6 +371,46 @@ class MarketScannerViewModel(
         if (_uiState.value.autoRefreshEnabled) {
             startAutoRefresh()
         }
+    }
+
+    /**
+     * Starts the public-market scanner and periodic refresh.
+     * This does not place exchange orders.
+     */
+    fun startScannerEngine() {
+        if (!_uiState.value.autoRefreshEnabled) {
+            _uiState.value = _uiState.value.copy(autoRefreshEnabled = true)
+            startAutoRefresh()
+        }
+        scanMarkets()
+    }
+
+    /**
+     * Stops periodic scanning and cancels the active market request.
+     * Previously received market rows remain visible.
+     */
+    fun stopScannerEngine() {
+        stopAutoRefresh()
+        cancelScan()
+    }
+
+    /**
+     * Emergency-stops scanner, analysis and public-trade fetch jobs.
+     * It does not cancel or close any exchange order or position.
+     */
+    fun killScannerEngine() {
+        stopAutoRefresh()
+        cancelScan()
+        analysisJobs.values.forEach { it.cancel() }
+        analysisJobs.clear()
+        tradeJobs.values.forEach { it.cancel() }
+        tradeJobs.clear()
+        _uiState.value = _uiState.value.copy(
+            isScanning = false,
+            autoRefreshEnabled = false,
+            analysisBySymbol = emptyMap(),
+            tradeLoadingSymbols = emptySet()
+        )
     }
 
     fun toggleAutoRefresh() {
@@ -365,6 +465,9 @@ class MarketScannerViewModel(
                 _uiState.value = _uiState.value.copy(
                     tradeFlowBySymbol = _uiState.value.tradeFlowBySymbol + (normalizedSymbol to summary)
                 )
+                // The combined buy-flow ranking depends on this newly loaded data.
+                // Re-sort immediately so the visible list does not remain stale.
+                refreshDisplayedResults()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -401,7 +504,9 @@ class MarketScannerViewModel(
                     symbol = normalizedSymbol,
                     resolution = DEFAULT_CANDLE_RESOLUTION,
                     fromUnixSeconds = window.fromUnixSeconds,
-                    toUnixSeconds = window.toUnixSeconds
+                    toUnixSeconds = window.toUnixSeconds,
+                    enabledStrategyIds = enabledStrategyIds,
+                    minimumAgreement = minimumStrategyAgreement
                 )
                 _uiState.value = _uiState.value.copy(
                     analysisBySymbol = _uiState.value.analysisBySymbol +
@@ -435,6 +540,7 @@ class MarketScannerViewModel(
         _uiState.value = _uiState.value.copy(
             isScanning = false,
             results = emptyList(),
+            rawResults = emptyList(),
             errorMessage = null,
             completedCount = 0,
             totalCount = 0,
