@@ -36,6 +36,7 @@ import ir.nobitextrader.app.data.NobitexCandlesApi
 import ir.nobitextrader.app.data.NobitexMarketApi
 import ir.nobitextrader.app.scanner.MarketScannerScreen
 import ir.nobitextrader.app.scanner.MarketScannerViewModel
+import ir.nobitextrader.app.paper.PaperTradingScreen
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -44,7 +45,8 @@ import java.util.Locale
 private enum class AppScreen {
     HOME,
     SETTINGS,
-    SCANNER
+    SCANNER,
+    PAPER
 }
 
 class MainActivity : ComponentActivity() {
@@ -170,7 +172,24 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        AppScreen.HOME -> {
+                                                AppScreen.PAPER -> {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                Button(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    onClick = { screen = AppScreen.HOME }
+                                ) {
+                                    Text(if (english) "Back to home" else "بازگشت به صفحه اصلی")
+                                }
+                                PaperTradingScreen(
+                                    modifier = Modifier.fillMaxSize(),
+                                    english = english
+                                )
+                            }
+                        }
+
+AppScreen.HOME -> {
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -224,6 +243,15 @@ class MainActivity : ComponentActivity() {
                                             "ورود به اسکن بازار نوبیتکس"
                                         }
                                     )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Button(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { screen = AppScreen.PAPER }
+                                ) {
+                                    Text(if (english) "Paper trading (virtual money)" else "خرید و فروش مجازی با پول کاغذی")
                                 }
 
                                 Spacer(modifier = Modifier.height(16.dp))
