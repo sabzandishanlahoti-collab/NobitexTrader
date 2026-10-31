@@ -60,6 +60,8 @@ internal fun PaperTradeScreen(
     val feeIsConfigured = feeRatePercent.isFinite() && feeRatePercent > 0.0 && feeRatePercent <= 2.0
     val paperTradeEnabled = priceIsFresh && feeIsConfigured
     val btcQty = portfolio.quantity("BTCIRT")
+    val positionMarketValue = if (priceIsFresh) price!! * btcQty else null
+    val totalEquity = positionMarketValue?.let { portfolio.cash + it }
     val unrealized = if (priceIsFresh && feeIsConfigured) {
         val gross = (price!! - portfolio.averageEntry("BTCIRT")) * btcQty
         val estimatedExitFee = price * btcQty * feeRatePercent / 100.0
@@ -98,6 +100,34 @@ internal fun PaperTradeScreen(
                     (if (english) "BTC quantity: " else "مقدار بیت‌کوین: ") +
                         String.format(Locale.US, "%.8f", btcQty),
                     color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    (if (english) "POSITION VALUE: " else "ارزش دارایی در گردش: ") +
+                        (positionMarketValue?.let { String.format(Locale.US, "%,.0f IRR", it) } ?: "—"),
+                    color = when {
+                        unrealized == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                        unrealized >= 0.0 -> AfaColorSchemes.profit
+                        else -> AfaColorSchemes.loss
+                    },
+                    fontSize = 12.sp
+                )
+                Text(
+                    (if (english) "TOTAL VIRTUAL EQUITY: " else "کل سرمایه مجازی: ") +
+                        (totalEquity?.let { String.format(Locale.US, "%,.0f IRR", it) } ?: "—"),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 16.sp
+                )
+                Text(
+                    (if (english) "TOTAL NET P/L: " else "سود/زیان خالص کل: ") +
+                        (if (unrealized != null) String.format(
+                            Locale.US, "%+,.0f IRR", portfolio.realizedPnl + unrealized
+                        ) else "—"),
+                    color = when {
+                        unrealized == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                        portfolio.realizedPnl + unrealized >= 0.0 -> AfaColorSchemes.profit
+                        else -> AfaColorSchemes.loss
+                    },
+                    fontSize = 13.sp
                 )
                 Text(
                     (if (english) "Unrealized P/L: " else "سود/زیان تحقق‌نیافته: ") +
