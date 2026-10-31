@@ -158,7 +158,8 @@ internal fun PaperTradeScreen(
                         fontSize = 11.sp
                     )
                     portfolio.positions.forEach { position ->
-                        val currentPrice = if (position.symbol == "BTCIRT" && priceIsFresh) price else null
+                        val currentPrice = if (position.symbol == "BTCIRT") freshBtcPrice ?: freshMarketPrices[position.symbol]
+                            else freshMarketPrices[position.symbol]
                         val positionPnl = currentPrice?.let {
                             (it - position.averageEntry) * position.quantity -
                                 (it * position.quantity * feeRatePercent / 100.0)
