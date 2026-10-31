@@ -19,9 +19,10 @@ import androidx.compose.ui.unit.sp
  */
 object AfaColorSchemes {
     private val cyan = Color(0xFF35DDE0)
-    private val darkBackground = Color(0xFF070D18)
-    private val darkSurface = Color(0xFF101B2B)
-    private val darkSurfaceVariant = Color(0xFF19283A)
+    private val terminalOlive = Color(0xFF17251D)
+    private val darkBackground = Color(0xFF020609)
+    private val darkSurface = Color(0xFF071019)
+    private val darkSurfaceVariant = Color(0xFF101B1B)
     private val darkText = Color(0xFFEAFBFC)
     private val mutedText = Color(0xFFA9C2CC)
 
@@ -39,8 +40,8 @@ object AfaColorSchemes {
             onBackground = darkText,
             onSurface = darkText,
             onSurfaceVariant = mutedText,
-            outline = Color(0xFF31515A),
-            outlineVariant = Color(0xFF243B4A),
+            outline = Color(0xFF286D65),
+            outlineVariant = Color(0xFF183B39),
             error = Color(0xFFFF647C)
         )
     } else {
@@ -63,10 +64,12 @@ object AfaColorSchemes {
         )
     }
 
-    val profit = Color(0xFF35D6B0)
+    val profit = Color(0xFF28E6A5)
     val loss = Color(0xFFFF647C)
     val warning = Color(0xFFFFC66D)
     val info = Color(0xFF35DDE0)
+    val terminalPanel = terminalOlive
+    val terminalGlow = Color(0xFF20F0B5)
 }
 
 private val AfaTypography = Typography(
