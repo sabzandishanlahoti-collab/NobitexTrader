@@ -32,6 +32,33 @@ class PublicTradeFlowSummaryTest {
     }
 
     @Test
+    fun rejectsNegativeTradeVolumeEvenWhenSummaryWouldRemainFinite() {
+        assertIllegalArgument {
+            PublicTradeFlowSummary.from(
+                listOf(trade(1L, 10.0, -1.0, TradeSide.BUY))
+            )
+        }
+    }
+
+    @Test
+    fun rejectsNonPositiveTradeTimestamp() {
+        assertIllegalArgument {
+            PublicTradeFlowSummary.from(
+                listOf(trade(0L, 10.0, 1.0, TradeSide.BUY))
+            )
+        }
+    }
+
+    @Test
+    fun rejectsNonFiniteTradePrice() {
+        assertIllegalArgument {
+            PublicTradeFlowSummary.from(
+                listOf(trade(1L, Double.POSITIVE_INFINITY, 1.0, TradeSide.BUY))
+            )
+        }
+    }
+
+    @Test
     fun summarizesFiniteBuyAndSellFlow() {
         val summary = PublicTradeFlowSummary.from(
             listOf(
