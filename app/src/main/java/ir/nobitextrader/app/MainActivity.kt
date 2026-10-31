@@ -146,7 +146,7 @@ private fun DashboardScreen(
                     fontSize = 18.sp
                 )
                 Text(
-                    if (english) "NOBITEX • AFA ESNIPER" else "نوبیتکس • آفا اسنایپر",
+                    if (english) "NOBITEX • AFA SNIPER" else "نوبیتکس • آفا اسنایپر",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
@@ -579,7 +579,8 @@ private fun SectionPanel(title: String, subtitle: String, empty: String) {
     androidx.compose.material3.Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Column(
             modifier = Modifier.padding(14.dp),

@@ -31,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,13 +38,6 @@ import java.util.Locale
 
 private const val SETTINGS_PREFS = "nobitex_trader_settings"
 
-private val AccentGreen = Color(0xFF35DDE0)
-private val AccentGreenDark = Color(0xFF087E88)
-private val DarkBackground = Color(0xFF070D18)
-private val DarkSurface = Color(0xFF101B2B)
-private val DarkSurfaceAlt = Color(0xFF19283A)
-private val LightBackground = Color(0xFFF3FAFB)
-private val LightSurface = Color(0xFFFFFFFF)
 
 data class TraderSettings(
     val useEnglish: Boolean = false,
@@ -110,7 +102,7 @@ fun SettingsScreen(
     val dark = settings.darkTheme
     val scheme = AfaColorSchemes.create(dark)
 
-    MaterialTheme(colorScheme = scheme) {
+    MaterialTheme(colorScheme = scheme, typography = MaterialTheme.typography, shapes = MaterialTheme.shapes) {
         Column(
             modifier = modifier
                 .fillMaxSize()
@@ -316,8 +308,8 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentGreenDark,
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text(
@@ -340,10 +332,10 @@ private fun SettingsSection(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = if (dark) DarkSurface else LightSurface,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             1.dp,
-            if (dark) Color(0xFF24414A) else Color(0xFFE0E7E1)
+            MaterialTheme.colorScheme.outline
         ),
         tonalElevation = 1.dp
     ) {
@@ -401,12 +393,12 @@ private fun SettingSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color(0xFFE8FCFC),
-                checkedTrackColor = AccentGreenDark,
-                checkedBorderColor = AccentGreen,
-                uncheckedThumbColor = Color(0xFFB6C9CC),
-                uncheckedTrackColor = Color(0xFF263E46),
-                uncheckedBorderColor = Color(0xFF5C7B82)
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                checkedBorderColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                uncheckedBorderColor = MaterialTheme.colorScheme.outline
             )
         )
     }
@@ -445,10 +437,10 @@ private fun SettingSlider(
             valueRange = valueRange,
             steps = steps,
             colors = SliderDefaults.colors(
-                thumbColor = AccentGreen,
-                activeTrackColor = AccentGreenDark,
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
                 inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.65f),
-                activeTickColor = Color(0xFFB7F4F4),
+                activeTickColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 inactiveTickColor = MaterialTheme.colorScheme.outline
             )
         )
@@ -462,13 +454,13 @@ private fun StatusTag(
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = if (dark) Color(0xFF16343B) else Color(0xFFE5EEE7)
+        color = MaterialTheme.colorScheme.tertiaryContainer
     ) {
         Text(
             text = text,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelSmall,
-            color = if (dark) Color(0xFFB7F4F4) else AccentGreenDark,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
             fontWeight = FontWeight.Bold
         )
     }
