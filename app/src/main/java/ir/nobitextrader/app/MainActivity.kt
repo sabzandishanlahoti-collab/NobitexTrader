@@ -324,6 +324,20 @@ private fun DashboardScreen(
                         )
                     }
                 }
+                Text(
+                    if (scannerState.autoRefreshEnabled) {
+                        if (english) {
+                            "AUTO SCAN ON • every ${scannerState.refreshIntervalMs / 1_000L}s"
+                        } else {
+                            "اسکن خودکار روشن • هر ${scannerState.refreshIntervalMs / 1_000L} ثانیه"
+                        }
+                    } else {
+                        if (english) "AUTO SCAN OFF • manual scans only" else "اسکن خودکار خاموش • فقط اسکن دستی"
+                    },
+                    color = if (scannerState.autoRefreshEnabled) AfaColorSchemes.profit else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
                 if (scannerState.isScanning || scannerState.totalCount > 0) {
                     Text(
                         if (english) {
@@ -335,14 +349,12 @@ private fun DashboardScreen(
                         fontSize = 11.sp
                     )
                 }
-                if (scannerState.results.isNotEmpty()) {
-                    val successful = scannerState.results.count { it.success }
-                    val failed = scannerState.results.size - successful
+                if (scannerState.totalCount > 0 || scannerState.results.isNotEmpty()) {
                     Text(
                         if (english) {
-                            "Valid books: $successful   •   Failed: $failed"
+                            "Valid books: ${scannerState.successfulCount}   •   Failed: ${scannerState.failedCount}"
                         } else {
-                            "دفتر سفارش معتبر: $successful   •   ناموفق: $failed"
+                            "دفتر سفارش معتبر: ${scannerState.successfulCount}   •   ناموفق: ${scannerState.failedCount}"
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
@@ -370,6 +382,13 @@ private fun DashboardScreen(
                                 )
                             }
                         }
+                } else if (!scannerState.isScanning) {
+                    Text(
+                        if (english) "No scan results yet. Run a scan to populate this panel."
+                        else "هنوز نتیجه‌ای ثبت نشده؛ برای تکمیل این بخش اسکن بازار را اجرا کنید.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
                 }
                 scannerState.errorMessage?.let { message ->
                     Text(message, color = AfaColorSchemes.loss, fontSize = 11.sp)
