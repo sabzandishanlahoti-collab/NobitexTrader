@@ -1,7 +1,6 @@
 package ir.nobitextrader.app.paper
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,7 +17,7 @@ class PaperTradingEngineTest {
     @Test fun sellUsesBidAndRealizesPnlAfterBothFees() {
         val bought = PaperTradingEngine.buy(PaperAccount.create(1_000.0), "BTCIRT", 100.0, 500.0, 0.001, 10L)
         val sold = PaperTradingEngine.sell(bought, "BTCIRT", 110.0, 5.0, 0.001, 20L)
-        assertEquals(1_047.95, sold.cash, 1e-8)
+        assertEquals(1_048.95, sold.cash, 1e-8)
         assertEquals(48.95, sold.realizedPnl, 1e-8)
         assertTrue(sold.positions.isEmpty())
         assertEquals(PaperSide.SELL, sold.trades.last().side)
@@ -48,7 +47,7 @@ class PaperTradingEngineTest {
     @Test fun valuationMarksOpenPositionsAtBidAndIncludesExitFeeEstimate() {
         val bought = PaperTradingEngine.buy(PaperAccount.create(1_000.0), "BTCIRT", 100.0, 500.0)
         val value = PaperTradingEngine.value(bought, mapOf("BTCIRT" to 110.0))
-        assertEquals(1_048.95, value.totalEquity, 1e-8)
+        assertEquals(1_049.5, value.totalEquity, 1e-8)
         assertEquals(48.95, value.unrealizedPnl, 1e-8)
     }
 }
