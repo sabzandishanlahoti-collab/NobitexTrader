@@ -37,7 +37,8 @@ private const val PAPER_PRICE_MAX_AGE_MS = 45_000L
 internal fun PaperTradeScreen(
     english: Boolean,
     market: MarketStats?,
-    marketUpdatedAt: Long?
+    marketUpdatedAt: Long?,
+    feeRatePercent: Double
 ) {
     val context = LocalContext.current
     var portfolio by remember { mutableStateOf(PaperTradingStore.load(context)) }
@@ -56,6 +57,8 @@ internal fun PaperTradeScreen(
     val priceAgeMs = marketUpdatedAt?.let { (nowMillis - it).coerceAtLeast(0L) }
     val priceIsFresh = price != null && priceAgeMs != null &&
         priceAgeMs <= PAPER_PRICE_MAX_AGE_MS
+    val feeIsConfigured = feeRatePercent.isFinite() && feeRatePercent > 0.0 && feeRatePercent <= 2.0
+    val paperTradeEnabled = priceIsFresh && feeIsConfigured
     val btcQty = portfolio.quantity("BTCIRT")
     val unrealized = if (priceIsFresh) {
         (price!! - portfolio.averageEntry("BTCIRT")) * btcQty
@@ -121,6 +124,14 @@ internal fun PaperTradeScreen(
             }
         }
 
+        if (!feeIsConfigured) {
+            Text(
+                if (english) "FEE NOT CONFIGURED • SET YOUR ACCOUNT RATE IN SETTINGS" else "کارمزد تنظیم نشده • نرخ حساب خودت را در تنظیمات وارد کن",
+                color = AfaColorSchemes.loss,
+                fontSize = 11.sp
+            )
+        }
+
         if (!priceIsFresh) {
             Text(
                 if (english) "MARKET PRICE STALE • BUY/SELL LOCKED • WAIT FOR A SUCCESSFUL REFRESH"
@@ -143,7 +154,7 @@ internal fun PaperTradeScreen(
                     try {
                         val p = price?.takeIf { priceIsFresh } ?: error("Market price is stale or unavailable")
                         portfolio = PaperTradingStore.execute(
-                            context, "BUY", "BTCIRT", quantityText.trim().toDouble(), p
+                            context, "BUY", "BTCIRT", quantityText.trim().toDouble(), p, feeRatePercent
                         )
                         message = if (english) "Virtual buy recorded." else "خرید مجازی ثبت شد."
                     } catch (e: Exception) {
@@ -151,14 +162,14 @@ internal fun PaperTradeScreen(
                     }
                 },
                 modifier = Modifier.weight(1f),
-                enabled = priceIsFresh
+                enabled = paperTradeEnabled
             ) { Text(if (english) "BUY • PAPER" else "خرید مجازی") }
             OutlinedButton(
                 onClick = {
                     try {
                         val p = price?.takeIf { priceIsFresh } ?: error("Market price is stale or unavailable")
                         portfolio = PaperTradingStore.execute(
-                            context, "SELL", "BTCIRT", quantityText.trim().toDouble(), p
+                            context, "SELL", "BTCIRT", quantityText.trim().toDouble(), p, feeRatePercent
                         )
                         message = if (english) "Virtual sell recorded." else "فروش مجازی ثبت شد."
                     } catch (e: Exception) {
@@ -206,8 +217,8 @@ internal fun PaperTradeScreen(
             }
         }
         Text(
-            if (english) "Paper ledger only. Fee model is not configured yet; displayed P/L excludes fees."
-            else "فقط دفتر مجازی. کارمزد هنوز تنظیم نشده و سودوزیان نمایش‌داده‌شده بدون کارمزد است.",
+            if (english) "Paper ledger only • fee ${String.format(Locale.US, "%.2f", feeRatePercent)}% per side • P/L includes recorded fees."
+            else "دفتر مجازی • کارمزد هر سمت ${String.format(Locale.US, "%.2f", feeRatePercent)}٪ • سودوزیان شامل کارمزد ثبت‌شده است.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 9.sp
         )
