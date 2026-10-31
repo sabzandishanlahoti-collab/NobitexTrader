@@ -4,6 +4,7 @@ import android.content.Context
 import ir.nobitextrader.app.scanner.MarketScanner
 import ir.nobitextrader.app.strategy.StrategyAnalysisCoordinator
 import ir.nobitextrader.app.strategy.StrategyId
+import ir.nobitextrader.app.strategy.TradeDirection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -92,10 +93,17 @@ internal object PaperAutoTradingRunner {
         }
 
         val portfolio = PaperTradingStore.load(context)
-        val orderBudget = minOf(
-            DEFAULT_ORDER_BUDGET_IRR,
-            portfolio.cash * MAX_CASH_FRACTION_PER_ORDER
-        )
+        val orderBudget = when (decision.direction) {
+            TradeDirection.LONG -> minOf(
+                DEFAULT_ORDER_BUDGET_IRR,
+                portfolio.cash * MAX_CASH_FRACTION_PER_ORDER
+            )
+            TradeDirection.SHORT -> minOf(
+                DEFAULT_ORDER_BUDGET_IRR,
+                portfolio.quantity("BTCIRT") * market.bestBid
+            )
+            TradeDirection.FLAT -> 0.0
+        }
         val plan = PaperAutoTradingPolicy.plan(
             decision = decision,
             market = market,
