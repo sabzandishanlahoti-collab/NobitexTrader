@@ -28,17 +28,19 @@ class StrategyAnalysisCoordinator(
         )
     },
     strategies: List<TradingStrategy> = defaultStrategies(),
-    private val decisionEngine: StrategyDecisionEngine =
-        StrategyDecisionEngine()
+    private val decisionEngineFactory: (Int) -> StrategyDecisionEngine =
+        { minimum -> StrategyDecisionEngine(minimum) }
 ) {
-    private val orchestrator = StrategyOrchestrator(strategies)
+    private val registeredStrategies = strategies.toList()
 
     suspend fun analyze(
         symbol: String,
         resolution: String,
         fromUnixSeconds: Long,
         toUnixSeconds: Long,
-        enabled: Boolean = true
+        enabled: Boolean = true,
+        enabledStrategyIds: Set<StrategyId> = registeredStrategies.map { it.id }.toSet(),
+        minimumAgreement: Int = StrategyDecisionEngine.DEFAULT_MINIMUM_AGREEMENT
     ): StrategyAnalysisResult {
         val candles = try {
             candleLoader(
@@ -60,7 +62,8 @@ class StrategyAnalysisCoordinator(
             )
         }
 
-        val batch = orchestrator.evaluate(
+        val activeStrategies = registeredStrategies.filter { it.id in enabledStrategyIds }
+        val batch = StrategyOrchestrator(activeStrategies).evaluate(
             StrategyContext(
                 symbol = symbol,
                 candles = candles,
@@ -72,7 +75,7 @@ class StrategyAnalysisCoordinator(
             symbol = symbol,
             candles = candles,
             batch = batch,
-            decision = decisionEngine.decide(batch),
+            decision = decisionEngineFactory(minimumAgreement.coerceIn(1, 5)).decide(batch),
             fetchError = null
         )
     }
