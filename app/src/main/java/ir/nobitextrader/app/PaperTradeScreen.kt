@@ -60,8 +60,10 @@ internal fun PaperTradeScreen(
     val feeIsConfigured = feeRatePercent.isFinite() && feeRatePercent > 0.0 && feeRatePercent <= 2.0
     val paperTradeEnabled = priceIsFresh && feeIsConfigured
     val btcQty = portfolio.quantity("BTCIRT")
-    val unrealized = if (priceIsFresh) {
-        (price!! - portfolio.averageEntry("BTCIRT")) * btcQty
+    val unrealized = if (priceIsFresh && feeIsConfigured) {
+        val gross = (price!! - portfolio.averageEntry("BTCIRT")) * btcQty
+        val estimatedExitFee = price * btcQty * feeRatePercent / 100.0
+        gross - estimatedExitFee
     } else null
     val priceText = when {
         price == null -> if (english) "Unavailable" else "در دسترس نیست"
