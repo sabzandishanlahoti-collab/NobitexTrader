@@ -479,7 +479,7 @@ private fun DashboardScreen(
                         Text(if (marketLoading) "…" else if (english) "REFRESH" else "بروزرسانی", fontSize = 11.sp)
                     }
                 }
-                if (marketLoading && marketResult == null) {
+                if (marketLoading) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
                             modifier = Modifier.width(18.dp).height(18.dp),
@@ -487,17 +487,24 @@ private fun DashboardScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            if (english) "Loading public market data…" else "در حال دریافت داده عمومی بازار…",
+                            if (marketResult == null) {
+                                if (english) "Loading public market data…" else "در حال دریافت داده عمومی بازار…"
+                            } else {
+                                if (english) "Refreshing public market data…" else "در حال بروزرسانی داده بازار…"
+                            },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
                     }
-                } else if (marketResult == null) {
-                    Text(
-                        if (english) "No public market snapshot is available. Check your connection and retry." else "داده‌ای از بازار دریافت نشده است. اتصال اینترنت را بررسی و دوباره تلاش کنید.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
-                    )
+                }
+                if (marketResult == null) {
+                    if (!marketLoading) {
+                        Text(
+                            if (english) "No public market snapshot is available. Check your connection and retry." else "داده‌ای از بازار دریافت نشده است. اتصال اینترنت را بررسی و دوباره تلاش کنید.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
                 } else {
                     Text("BTC / IRT  •  ${marketResult.market}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     Text(
