@@ -115,6 +115,55 @@ internal fun PaperTradeScreen(
                     },
                     fontSize = 12.sp
                 )
+                if (portfolio.positions.isNotEmpty()) {
+                    Text(
+                        if (english) "OPEN POSITIONS" else "نمادهای خریداری‌شده و وضعیت آن‌ها",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 11.sp
+                    )
+                    portfolio.positions.forEach { position ->
+                        val currentPrice = if (position.symbol == "BTCIRT" && priceIsFresh) price else null
+                        val positionPnl = currentPrice?.let {
+                            (it - position.averageEntry) * position.quantity -
+                                (it * position.quantity * feeRatePercent / 100.0)
+                        }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                position.symbol,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 11.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                            Text(
+                                when {
+                                    positionPnl == null -> if (english) "PRICE UNAVAILABLE" else "قیمت در دسترس نیست"
+                                    positionPnl > 0.0 -> "↑ " + (if (english) "UP" else "صعودی")
+                                    positionPnl < 0.0 -> "↓ " + (if (english) "DOWN" else "نزولی")
+                                    else -> if (english) "FLAT" else "بدون تغییر"
+                                },
+                                color = when {
+                                    positionPnl == null || positionPnl == 0.0 -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    positionPnl > 0.0 -> AfaColorSchemes.profit
+                                    else -> AfaColorSchemes.loss
+                                },
+                                fontSize = 11.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            (if (english) "Qty " else "مقدار ") +
+                                String.format(Locale.US, "%.8f", position.quantity) +
+                                (positionPnl?.let { " • " + String.format(Locale.US, "%+,.0f IRR", it) } ?: ""),
+                            color = positionPnl?.let {
+                                if (it >= 0.0) AfaColorSchemes.profit else AfaColorSchemes.loss
+                            } ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
                 Text(
                     (if (english) "TOTAL VIRTUAL EQUITY: " else "کل سرمایه مجازی: ") +
                         (totalEquity?.let { String.format(Locale.US, "%,.0f IRR", it) } ?: "—"),
