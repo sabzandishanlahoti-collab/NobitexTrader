@@ -24,8 +24,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -110,33 +108,7 @@ fun SettingsScreen(
 
     val english = settings.useEnglish
     val dark = settings.darkTheme
-    val scheme = if (dark) {
-        darkColorScheme(
-            primary = AccentGreen,
-            onPrimary = Color(0xFF07110C),
-            secondary = Color(0xFF8CECEF),
-            background = DarkBackground,
-            surface = DarkSurface,
-            surfaceVariant = DarkSurfaceAlt,
-            onBackground = Color(0xFFEAFBFC),
-            onSurface = Color(0xFFEAFBFC),
-            onSurfaceVariant = Color(0xFFA9C2CC),
-            outline = Color(0xFF31515A)
-        )
-    } else {
-        lightColorScheme(
-            primary = AccentGreenDark,
-            onPrimary = Color.White,
-            secondary = AccentGreen,
-            background = LightBackground,
-            surface = LightSurface,
-            surfaceVariant = Color(0xFFE1F2F3),
-            onBackground = Color(0xFF102329),
-            onSurface = Color(0xFF102329),
-            onSurfaceVariant = Color(0xFF526B72),
-            outline = Color(0xFFC9E0E2)
-        )
-    }
+    val scheme = AfaColorSchemes.create(dark)
 
     MaterialTheme(colorScheme = scheme) {
         Column(
