@@ -306,6 +306,32 @@ fun SettingsScreen(
             }
 
             SettingsSection(
+                title = if (english) "PAPER TRADING COSTS" else "هزینه‌های معاملات مجازی",
+                subtitle = if (english) "Configure the local paper-ledger fee" else "تنظیم کارمزد دفتر معاملات مجازی",
+                dark = dark
+            ) {
+                SettingSlider(
+                    title = if (english) "Fee per side" else "کارمزد هر سمت معامله",
+                    valueLabel = String.format(Locale.US, "%.2f%%", settings.paperFeePercent),
+                    value = settings.paperFeePercent,
+                    valueRange = 0f..2f,
+                    steps = 199,
+                    onValueChange = {
+                        updateSettings(settings.copy(paperFeePercent = it.coerceIn(0f, 2f)))
+                    }
+                )
+                Text(
+                    text = if (english) {
+                        "Applied separately to every buy and sell. Default is 0% until you set the rate for your account. This is a simulation setting, not a verified Nobitex fee quote."
+                    } else {
+                        "برای هر خرید و فروش جداگانه اعمال می‌شود. پیش‌فرض صفر است تا نرخ مربوط به حساب خودت را تعیین کنی. این تنظیم شبیه‌سازی است و نرخ قطعی کارمزد نوبیتکس نیست."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            SettingsSection(
                 title = if (english) "LOCAL STORAGE" else "ذخیره‌سازی و بازنشانی",
                 subtitle = if (english) "Preferences are stored on this device" else "تنظیمات فعلی روی همین دستگاه ذخیره می‌شوند",
                 dark = dark
