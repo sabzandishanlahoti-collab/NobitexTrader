@@ -141,12 +141,20 @@ private fun DashboardScreen(
 ) {
     val paperPositions = paperPortfolio.positions.filter { it.quantity > 0.0 }
     val paperInvestedCost = paperPositions.sumOf { it.quantity * it.averageEntry }
+    val nowMillis = System.currentTimeMillis()
+    val freshBtcPrice = marketResult?.latest?.takeIf {
+        it.isFinite() && it > 0.0 &&
+            marketUpdatedAt != null && nowMillis - marketUpdatedAt <= 60_000L
+    }
     val paperPositionMarks = paperPositions.map { position ->
-        val scannedPrice = scannerState.rawResults.firstOrNull {
-            it.symbol == position.symbol && it.success
-        }?.lastPrice
+        val scannedResult = scannerState.rawResults.firstOrNull {
+            it.symbol == position.symbol && it.success &&
+                it.observedAtMillis > 0L &&
+                nowMillis - it.observedAtMillis <= 120_000L
+        }
+        val scannedPrice = scannedResult?.lastPrice
         val currentPrice = if (position.symbol == "BTCIRT") {
-            marketResult?.latest?.takeIf { it.isFinite() && it > 0.0 } ?: scannedPrice
+            freshBtcPrice ?: scannedPrice
         } else {
             scannedPrice
         }
@@ -441,7 +449,7 @@ private fun DashboardScreen(
                         fontSize = 11.sp
                     )
                 }
-                if (scannerState.totalCount > 0 || scannerState.results.isNotEmpty()) {
+                if (scannerState.totalCount > 0 || scannerState.results.isNotEmpty() || scannerState.rawResults.isNotEmpty()) {
                     Text(
                         if (english) {
                             "Valid books: ${scannerState.successfulCount}   •   Failed: ${scannerState.failedCount}"
