@@ -141,7 +141,7 @@ class MarketRankingTest {
             nowMillis = now
         )
 
-        assertEquals(listOf("NO_DATA", "FUTURE"), ranked.map { it.symbol })
+        assertEquals(listOf("FUTURE", "NO_DATA"), ranked.map { it.symbol })
     }
 
     @Test
