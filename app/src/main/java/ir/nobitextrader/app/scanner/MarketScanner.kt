@@ -62,7 +62,7 @@ object MarketScanner {
                     symbol = symbol,
                     timeoutMillis = policy.requestTimeoutMillis
                 )
-                val result = toScanResult(snapshot, latestPrices[snapshot.symbol])
+                val result = toScanResult(snapshot)
                 results.add(result)
                 onResult?.invoke(result)
             } catch (e: CancellationException) {
@@ -124,7 +124,7 @@ object MarketScanner {
 
         for (snapshot in validSnapshots) {
             try {
-                val result = toScanResult(snapshot)
+                val result = toScanResult(snapshot, latestPrices[snapshot.symbol])
                 results.add(result)
                 onResult?.invoke(result)
             } catch (e: CancellationException) {
