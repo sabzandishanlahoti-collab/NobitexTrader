@@ -10,8 +10,8 @@ class PublicTradeFlowSummaryTest {
     @Test
     fun rejectsBuyQuoteVolumeSumOverflow() {
         val trades = listOf(
-            trade(time = 1L, price = 1e200, volume = 1e100, side = TradeSide.BUY),
-            trade(time = 2L, price = 1e200, volume = 1e100, side = TradeSide.BUY)
+            trade(time = 1L, price = 1e200, volume = 1e108, side = TradeSide.BUY),
+            trade(time = 2L, price = 1e200, volume = 1e108, side = TradeSide.BUY)
         )
 
         assertIllegalArgument {
@@ -22,8 +22,8 @@ class PublicTradeFlowSummaryTest {
     @Test
     fun rejectsSellQuoteVolumeSumOverflow() {
         val trades = listOf(
-            trade(time = 1L, price = 1e200, volume = 1e100, side = TradeSide.SELL),
-            trade(time = 2L, price = 1e200, volume = 1e100, side = TradeSide.SELL)
+            trade(time = 1L, price = 1e200, volume = 1e108, side = TradeSide.SELL),
+            trade(time = 2L, price = 1e200, volume = 1e108, side = TradeSide.SELL)
         )
 
         assertIllegalArgument {
