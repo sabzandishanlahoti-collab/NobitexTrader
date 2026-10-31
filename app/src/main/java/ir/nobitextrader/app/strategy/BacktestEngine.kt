@@ -67,9 +67,21 @@ class BacktestEngine {
                         TradeDirection.SHORT -> 1.0 - config.slippageRate
                         TradeDirection.FLAT -> 1.0
                     }
+                    // Do not enter on a stale signal when the executable open
+                    // (including configured entry slippage) has already crossed
+                    // either bracket boundary. The move has happened before entry.
+                    val entryStillValid = when (signal.direction) {
+                        TradeDirection.LONG ->
+                            entryPrice > signal.stopLossPrice &&
+                                entryPrice < signal.takeProfitPrice
+                        TradeDirection.SHORT ->
+                            entryPrice < signal.stopLossPrice &&
+                                entryPrice > signal.takeProfitPrice
+                        TradeDirection.FLAT -> false
+                    }
                     val quantity = config.positionNotional / entryPrice
                     val entryFee = config.positionNotional * config.feeRate
-                    if (quantity.isFinite() && entryFee.isFinite() &&
+                    if (entryStillValid && quantity.isFinite() && entryFee.isFinite() &&
                         config.positionNotional + entryFee <= equity
                     ) {
                         equity -= entryFee
