@@ -424,7 +424,11 @@ fun MarketScannerScreen(
                     rank = if (result.success) index + 1 else null,
                     sortMode = state.sortMode,
                     analysisState = state.analysisBySymbol[result.symbol],
-                    onAnalyze = { viewModel.analyzeMarket(result.symbol) }
+                    onAnalyze = { viewModel.analyzeMarket(result.symbol) },
+                    tradeFlow = state.tradeFlowBySymbol[result.symbol],
+                    tradeLoading = result.symbol in state.tradeLoadingSymbols,
+                    tradeError = state.tradeErrorBySymbol[result.symbol],
+                    onLoadTradeFlow = { viewModel.loadRecentTradeFlow(result.symbol, forceRefresh = true) }
                 )
             }
         }
@@ -553,7 +557,11 @@ private fun MarketResultCard(
     rank: Int?,
     sortMode: MarketSortMode,
     analysisState: StrategyAnalysisUiState?,
-    onAnalyze: () -> Unit
+    onAnalyze: () -> Unit,
+    tradeFlow: PublicTradeFlowSummary?,
+    tradeLoading: Boolean,
+    tradeError: String?,
+    onLoadTradeFlow: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -654,6 +662,51 @@ private fun MarketResultCard(
                 ) {
                     DataValue("عمق خرید ۵ سطح", formatNumber(result.bidLiquidityTop5))
                     DataValue("عمق فروش ۵ سطح", formatNumber(result.askLiquidityTop5))
+                }
+
+                OutlinedButton(
+                    onClick = onLoadTradeFlow,
+                    enabled = !tradeLoading,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = TerminalAmber,
+                        disabledContentColor = TerminalMuted
+                    ),
+                    shape = RoundedCornerShape(9.dp)
+                ) {
+                    Text(if (tradeLoading) "دریافت معاملات عمومی..." else "بررسی معاملات انجام‌شده")
+                }
+                tradeError?.let {
+                    Text("خطای معاملات: $it", color = TerminalRed, fontSize = 10.sp)
+                }
+                tradeFlow?.let { flow ->
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .background(TerminalPanelAlt, RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("جریان معاملات عمومی اخیر • ${flow.buyCount + flow.sellCount} معامله",
+                            color = TerminalAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            DataValue("تعداد خرید", flow.buyCount.toString())
+                            DataValue("تعداد فروش", flow.sellCount.toString())
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            DataValue("ارزش خرید", formatQuoteLiquidity(flow.buyQuoteVolume))
+                            DataValue("ارزش فروش", formatQuoteLiquidity(flow.sellQuoteVolume))
+                        }
+                        DataValue("خالص خرید منهای فروش",
+                            (if (flow.netQuoteFlow >= 0.0) "+" else "") + formatQuoteLiquidity(flow.netQuoteFlow))
+                        Text(
+                            flow.latestTradeTimeMillis?.let { "آخرین معامله: " +
+                                java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(java.util.Date(it)) }
+                                ?: "معامله‌ای در پاسخ اخیر موجود نبود",
+                            color = TerminalMuted, fontSize = 10.sp
+                        )
+                        Text("نمونه معاملات اخیر API عمومی؛ نه کل معاملات روز و نه سود حساب شخصی.",
+                            color = TerminalMuted, fontSize = 9.sp)
+                    }
                 }
 
                 OutlinedButton(
