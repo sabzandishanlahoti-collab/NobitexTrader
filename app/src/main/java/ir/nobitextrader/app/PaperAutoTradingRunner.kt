@@ -1,6 +1,7 @@
 package ir.nobitextrader.app
 
 import android.content.Context
+import ir.nobitextrader.app.scanner.MarketRefreshPolicy
 import ir.nobitextrader.app.scanner.MarketScanner
 import ir.nobitextrader.app.strategy.StrategyAnalysisCoordinator
 import ir.nobitextrader.app.strategy.StrategyId
@@ -84,7 +85,14 @@ internal object PaperAutoTradingRunner {
         }
 
         // Fetch the order book after analysis so the execution quote is recent.
-        val market = MarketScanner.scan(symbols = listOf("BTCIRT")).firstOrNull()
+        val marketPolicy = MarketRefreshPolicy(
+            requestTimeoutMillis = settings.requestTimeoutSeconds.coerceIn(1, 60) * 1_000L,
+            maxMarketsPerBatch = 1
+        )
+        val market = MarketScanner.scan(
+            symbols = listOf("BTCIRT"),
+            policy = marketPolicy
+        ).firstOrNull()
             ?: return@withContext Result.Rejected("دفتر سفارش BTC دریافت نشد.")
         if (!market.success) {
             return@withContext Result.Rejected(
