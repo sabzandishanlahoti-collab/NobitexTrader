@@ -38,7 +38,7 @@ internal data class PaperPortfolio(
 
 internal object PaperTradingStore {
     private const val PREFS = "afa_paper_wallet_v1"
-    private const val INITIAL_CASH = 1_000_000_000.0 // virtual IRR only
+    private const val INITIAL_CASH = 1_000_000_000.0
 
     fun load(context: Context): PaperPortfolio {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -48,46 +48,39 @@ internal object PaperTradingStore {
         val positions = buildList {
             for (index in 0 until positionsJson.length()) {
                 val item = positionsJson.getJSONObject(index)
-                add(
-                    PaperPosition(
-                        item.getString("symbol"),
-                        item.getDouble("quantity"),
-                        item.getDouble("averageEntry")
-                    )
-                )
+                add(PaperPosition(
+                    item.getString("symbol"),
+                    item.getDouble("quantity"),
+                    item.getDouble("averageEntry")
+                ))
             }
         }
 
         val trades = buildList {
             for (index in 0 until tradesJson.length()) {
                 val item = tradesJson.getJSONObject(index)
-                add(
-                    PaperTrade(
-                        id = item.getString("id"),
-                        side = item.getString("side"),
-                        symbol = item.getString("symbol"),
-                        quantity = item.getDouble("quantity"),
-                        price = item.getDouble("price"),
-                        total = item.getDouble("total"),
-                        timestamp = item.getLong("timestamp"),
-                        realizedPnl = item.optDouble("realizedPnl", 0.0),
-                        feeAmount = item.optDouble("feeAmount", 0.0)
-                    )
-                )
+                add(PaperTrade(
+                    id = item.getString("id"),
+                    side = item.getString("side"),
+                    symbol = item.getString("symbol"),
+                    quantity = item.getDouble("quantity"),
+                    price = item.getDouble("price"),
+                    total = item.getDouble("total"),
+                    timestamp = item.getLong("timestamp"),
+                    realizedPnl = item.optDouble("realizedPnl", 0.0),
+                    feeAmount = item.optDouble("feeAmount", 0.0)
+                ))
             }
         }
 
-        // Older installations have no cumulative key. Their retained trade records
-        // are the only recoverable source; older sells without realizedPnl count as 0.
+        // Legacy sells have no recoverable fee or historical net P/L.
         val realizedPnl = if (prefs.contains("realizedPnl")) {
             (prefs.getString("realizedPnl", "0") ?: "0").toDouble()
         } else {
             trades.sumOf { it.realizedPnl }
         }
-
         val cash = (prefs.getString("cash", INITIAL_CASH.toString())
             ?: INITIAL_CASH.toString()).toDouble()
-
         return PaperPortfolio(cash, positions, trades, realizedPnl)
     }
 
@@ -98,51 +91,48 @@ internal object PaperTradingStore {
         symbol: String,
         quantity: Double,
         price: Double,
-        feeRatePercent: Double
+        feeRate: Double
     ): PaperPortfolio {
         require(side == "BUY" || side == "SELL") { "Invalid side" }
         require(symbol.isNotBlank() && quantity.isFinite() && quantity > 0.0) {
             "Enter a valid quantity"
         }
         require(price.isFinite() && price > 0.0) { "No valid market price is available" }
-        require(feeRatePercent.isFinite() && feeRatePercent > 0.0 && feeRatePercent <= 2.0) {
-            "Configure a valid paper fee rate in Settings (0.01% to 2.00%)"
-        }
+        require(feeRate.isFinite() && feeRate in 0.0..0.02) { "Fee rate must be between 0% and 2%" }
 
         val old = load(context)
         val value = quantity * price
         require(value.isFinite() && value > 0.0) { "Invalid order value" }
-        val feeAmount = value * feeRatePercent / 100.0
-        require(feeAmount.isFinite() && feeAmount >= 0.0) { "Invalid fee amount" }
+        val fee = value * feeRate
+        require(fee.isFinite()) { "Invalid fee amount" }
 
         val oldQuantity = old.quantity(symbol)
         val oldAverage = old.averageEntry(symbol)
-
         val cash: Double
         val newQuantity: Double
         val newAverage: Double
         val tradeRealizedPnl: Double
 
         if (side == "BUY") {
-            require(value + feeAmount <= old.cash) { "Insufficient virtual cash including fee" }
-            cash = old.cash - value - feeAmount
+            val debit = value + fee
+            require(debit.isFinite() && debit <= old.cash) { "Insufficient virtual cash including fee" }
+            cash = old.cash - debit
             newQuantity = oldQuantity + quantity
-            newAverage = ((oldQuantity * oldAverage) + value + feeAmount) / newQuantity
+            // Buy fee is capitalized into the position's average cost.
+            newAverage = ((oldQuantity * oldAverage) + value + fee) / newQuantity
             tradeRealizedPnl = 0.0
         } else {
-            require(quantity <= oldQuantity + 1e-12) {
-                "Insufficient virtual position"
-            }
-            cash = old.cash + value - feeAmount
+            require(quantity <= oldQuantity + 1e-12) { "Insufficient virtual position" }
+            cash = old.cash + value - fee
             newQuantity = (oldQuantity - quantity).coerceAtLeast(0.0)
             newAverage = if (newQuantity <= 1e-12) 0.0 else oldAverage
-            tradeRealizedPnl = (price - oldAverage) * quantity - feeAmount
+            // Sell fee is deducted from the realized result.
+            tradeRealizedPnl = (price - oldAverage) * quantity - fee
         }
+        require(cash.isFinite() && cash >= -1e-8) { "Invalid virtual cash balance" }
 
         val positions = old.positions.filterNot { it.symbol == symbol }.toMutableList()
-        if (newQuantity > 1e-12) {
-            positions += PaperPosition(symbol, newQuantity, newAverage)
-        }
+        if (newQuantity > 1e-12) positions += PaperPosition(symbol, newQuantity, newAverage)
 
         val trade = PaperTrade(
             id = UUID.randomUUID().toString(),
@@ -153,49 +143,41 @@ internal object PaperTradingStore {
             total = value,
             timestamp = System.currentTimeMillis(),
             realizedPnl = tradeRealizedPnl,
-            feeAmount = feeAmount
+            feeAmount = fee
         )
         val trades = (listOf(trade) + old.trades).take(2000)
         val cumulativeRealizedPnl = old.realizedPnl + tradeRealizedPnl
 
         val positionsJson = JSONArray().apply {
             positions.forEach {
-                put(
-                    JSONObject()
-                        .put("symbol", it.symbol)
-                        .put("quantity", it.quantity)
-                        .put("averageEntry", it.averageEntry)
-                )
+                put(JSONObject()
+                    .put("symbol", it.symbol)
+                    .put("quantity", it.quantity)
+                    .put("averageEntry", it.averageEntry))
             }
         }
         val tradesJson = JSONArray().apply {
             trades.forEach {
-                put(
-                    JSONObject()
-                        .put("id", it.id)
-                        .put("side", it.side)
-                        .put("symbol", it.symbol)
-                        .put("quantity", it.quantity)
-                        .put("price", it.price)
-                        .put("total", it.total)
-                        .put("timestamp", it.timestamp)
-                        .put("realizedPnl", it.realizedPnl)
-                        .put("feeAmount", it.feeAmount)
-                )
+                put(JSONObject()
+                    .put("id", it.id)
+                    .put("side", it.side)
+                    .put("symbol", it.symbol)
+                    .put("quantity", it.quantity)
+                    .put("price", it.price)
+                    .put("total", it.total)
+                    .put("timestamp", it.timestamp)
+                    .put("realizedPnl", it.realizedPnl)
+                    .put("feeAmount", it.feeAmount))
             }
         }
 
-        check(
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putString("cash", cash.toString())
-                .putString("positions", positionsJson.toString())
-                .putString("trades", tradesJson.toString())
-                .putString("realizedPnl", cumulativeRealizedPnl.toString())
-                .commit()
-        ) {
-            "Could not save virtual transaction"
-        }
+        check(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString("cash", cash.toString())
+            .putString("positions", positionsJson.toString())
+            .putString("trades", tradesJson.toString())
+            .putString("realizedPnl", cumulativeRealizedPnl.toString())
+            .commit()) { "Could not save virtual transaction" }
 
         return PaperPortfolio(cash, positions, trades, cumulativeRealizedPnl)
     }
