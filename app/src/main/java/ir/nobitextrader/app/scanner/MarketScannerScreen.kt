@@ -328,6 +328,11 @@ fun MarketScannerScreen(
                     modifier = Modifier.weight(1f)
                 ) { viewModel.setSortMode(MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW) }
             }
+            SortButton(
+                text = "فشار خرید بیشتر",
+                selected = state.sortMode == MarketSortMode.BUY_PRESSURE_HIGH_TO_LOW,
+                modifier = Modifier.fillMaxWidth()
+            ) { viewModel.setSortMode(MarketSortMode.BUY_PRESSURE_HIGH_TO_LOW) }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -624,6 +629,8 @@ private fun MarketResultCard(
                         "مرتب‌شده بر اساس بیشترین عمق خرید"
                     MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW ->
                         "مرتب‌شده بر اساس بیشترین عمق فروش"
+                    MarketSortMode.BUY_PRESSURE_HIGH_TO_LOW ->
+                        "مرتب‌شده بر اساس سهم عمق خرید از مجموع عمق خرید و فروش"
                 }
                 Text(
                     rankingBasis,
