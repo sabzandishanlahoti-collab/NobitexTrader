@@ -14,6 +14,60 @@ class PaperTradingEngineTest {
         assertEquals(100.1, bought.positions.getValue("BTCIRT").averageEntryPrice, 1e-9)
     }
 
+    @Test fun allInBuyBudgetDeductsFeeInsteadOfAddingIt() {
+        val start = PaperAccount.create(1_000_000_000.0)
+        val bought = PaperTradingEngine.buyWithinBudget(
+            account = start,
+            symbol = "BTCIRT",
+            bestAsk = 100_000_000.0,
+            totalBudget = 250_000_000.0,
+            timestampMillis = 1L
+        )
+        assertEquals(750_000_000.0, bought.cash, 1e-5)
+        assertEquals(250_000_000.0, bought.positions.getValue("BTCIRT").costBasis, 1e-5)
+        assertEquals(250_000_000.0 * 0.001 / 1.001, bought.trades.single().fee, 1e-5)
+    }
+
+    @Test fun allInBuyRejectsOneBillionSingleSymbolOrder() {
+        val start = PaperAccount.create(1_000_000_000.0)
+        try {
+            PaperTradingEngine.buyWithinBudget(
+                account = start,
+                symbol = "BTCIRT",
+                bestAsk = 100_000_000.0,
+                totalBudget = 1_000_000_000.0
+            )
+            throw AssertionError("A single-symbol order above 25% must be rejected")
+        } catch (exception: IllegalArgumentException) {
+            assertTrue(exception.message.orEmpty().contains("Per-symbol limit"))
+        }
+    }
+
+    @Test fun allInBuyPreservesTwentyPercentPortfolioCashReserve() {
+        var account = PaperAccount.create(1_000_000_000.0)
+        listOf("BTCIRT", "ETHIRT", "XRPIRT", "LTCIRT").forEachIndexed { index, symbol ->
+            account = PaperTradingEngine.buyWithinBudget(
+                account = account,
+                symbol = symbol,
+                bestAsk = 100.0,
+                totalBudget = 200_000_000.0,
+                timestampMillis = index.toLong() + 1L
+            )
+        }
+        assertEquals(200_000_000.0, account.cash, 1e-4)
+        try {
+            PaperTradingEngine.buyWithinBudget(
+                account = account,
+                symbol = "BNBIRT",
+                bestAsk = 100.0,
+                totalBudget = 1.0
+            )
+            throw AssertionError("The portfolio reserve must not be consumed")
+        } catch (exception: IllegalArgumentException) {
+            assertTrue(exception.message.orEmpty().contains("Portfolio investment limit"))
+        }
+    }
+
     @Test fun sellUsesBidAndRealizesPnlAfterBothFees() {
         val bought = PaperTradingEngine.buy(PaperAccount.create(1_000.0), "BTCIRT", 100.0, 500.0, 0.001, 10L)
         val sold = PaperTradingEngine.sell(bought, "BTCIRT", 110.0, 5.0, 0.001, 20L)

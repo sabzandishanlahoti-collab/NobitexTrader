@@ -57,6 +57,8 @@ data class PaperPortfolioValue(
 
 object PaperTradingEngine {
     const val DEFAULT_FEE_RATE = 0.001
+    const val DEFAULT_MAX_POSITION_CAPITAL_PCT = 25.0
+    const val DEFAULT_MAX_TOTAL_INVESTED_PCT = 80.0
 
     fun buy(
         account: PaperAccount,
@@ -102,6 +104,234 @@ object PaperTradingEngine {
             positions = account.positions + (market to position),
             trades = account.trades + trade
         )
+    }
+
+    /**
+     * Uses an all-in budget: the fee is deducted from this amount, never added on top.
+     * One symbol is capped at 25% of initial capital; total investment is capped at 80%.
+     */
+    fun buyWithinBudget(
+        account: PaperAccount,
+        symbol: String,
+        bestAsk: Double,
+        totalBudget: Double,
+        feeRate: Double = DEFAULT_FEE_RATE,
+        maxPositionCapitalPct: Double = DEFAULT_MAX_POSITION_CAPITAL_PCT,
+        maxTotalInvestedPct: Double = DEFAULT_MAX_TOTAL_INVESTED_PCT,
+        timestampMillis: Long = System.currentTimeMillis()
+    ): PaperAccount {
+        validateFee(feeRate)
+        require(totalBudget.isFinite() && totalBudget > 0.0) { "Buy budget must be positive" }
+        require(maxPositionCapitalPct.isFinite() && maxPositionCapitalPct in 1.0..100.0) {
+            "Maximum position percentage must be between 1 and 100"
+        }
+        require(maxTotalInvestedPct.isFinite() && maxTotalInvestedPct in 1.0..100.0) {
+            "Maximum total investment percentage must be between 1 and 100"
+        }
+        val market = normalizeSymbol(symbol)
+        val maxPositionCost = account.initialCash * maxPositionCapitalPct / 100.0
+        val existingPositionCost = account.positions[market]?.costBasis ?: 0.0
+        require(existingPositionCost + totalBudget <= maxPositionCost + 1e-8) {
+            "Per-symbol limit exceeded: maximum is ${'
+        symbol: String,
+        bestBid: Double,
+        quantity: Double,
+        feeRate: Double = DEFAULT_FEE_RATE,
+        timestampMillis: Long = System.currentTimeMillis()
+    ): PaperAccount {
+        val market = normalizeSymbol(symbol)
+        validateMarketPrice(bestBid, "bestBid")
+        validateFee(feeRate)
+        require(quantity.isFinite() && quantity > 0.0) { "Sell quantity must be positive" }
+        val position = account.positions[market]
+            ?: throw IllegalArgumentException("No virtual position for $market")
+        require(quantity <= position.quantity + 1e-12) { "Sell quantity exceeds available position" }
+
+        val actualQuantity = quantity.coerceAtMost(position.quantity)
+        val gross = actualQuantity * bestBid
+        val fee = gross * feeRate
+        val allocatedBasis = position.costBasis * (actualQuantity / position.quantity)
+        val pnl = gross - fee - allocatedBasis
+        require(gross.isFinite() && fee.isFinite() && pnl.isFinite()) { "Invalid sell calculation" }
+
+        val remainingQuantity = position.quantity - actualQuantity
+        val remainingBasis = (position.costBasis - allocatedBasis).coerceAtLeast(0.0)
+        val nextPositions = if (remainingQuantity <= 1e-12) {
+            account.positions - market
+        } else {
+            account.positions + (market to position.copy(
+                quantity = remainingQuantity,
+                costBasis = remainingBasis,
+                averageEntryPrice = remainingBasis / remainingQuantity
+            ))
+        }
+        val trade = PaperTrade(
+            id = timestampMillis,
+            symbol = market,
+            side = PaperSide.SELL,
+            quantity = actualQuantity,
+            price = bestBid,
+            fee = fee,
+            realizedPnl = pnl,
+            timestampMillis = timestampMillis
+        )
+        return account.copy(
+            cash = account.cash + gross - fee,
+            realizedPnl = account.realizedPnl + pnl,
+            positions = nextPositions,
+            trades = account.trades + trade
+        )
+    }
+
+    fun value(
+        account: PaperAccount,
+        bestBids: Map<String, Double>,
+        feeRate: Double = DEFAULT_FEE_RATE
+    ): PaperPortfolioValue {
+        validateFee(feeRate)
+        var marketValue = 0.0
+        var unrealized = 0.0
+        var unpriced = 0
+        account.positions.values.forEach { position ->
+            val bid = bestBids[position.symbol]
+            if (bid == null) {
+                unpriced++
+                return@forEach
+            }
+            validateMarketPrice(bid, "bestBid")
+            val proceeds = position.quantity * bid
+            marketValue += proceeds
+            unrealized += proceeds - proceeds * feeRate - position.costBasis
+        }
+        return PaperPortfolioValue(
+            cash = account.cash,
+            positionsValue = marketValue,
+            unrealizedPnl = unrealized,
+            realizedPnl = account.realizedPnl,
+            totalEquity = account.cash + marketValue - (marketValue * feeRate),
+            unpricedPositionCount = unpriced
+        )
+    }
+
+    private fun normalizeSymbol(symbol: String): String {
+        val normalized = symbol.trim().uppercase(java.util.Locale.ROOT)
+        require(normalized.matches(Regex("[A-Z0-9]{3,20}"))) { "Invalid market symbol" }
+        return normalized
+    }
+
+    private fun validateMarketPrice(price: Double, field: String) {
+        require(price.isFinite() && price > 0.0) { "$field must be positive and finite" }
+    }
+
+    private fun validateFee(rate: Double) {
+        require(rate.isFinite() && rate in 0.0..0.05) { "Fee rate must be between 0 and 5%" }
+    }
+}
+}{maxPositionCapitalPct}% of initial capital"
+        }
+        val totalInvested = account.positions.values.sumOf { it.costBasis }
+        val maxTotalInvested = account.initialCash * maxTotalInvestedPct / 100.0
+        require(totalInvested + totalBudget <= maxTotalInvested + 1e-8) {
+            "Portfolio investment limit exceeded: ${'
+        symbol: String,
+        bestBid: Double,
+        quantity: Double,
+        feeRate: Double = DEFAULT_FEE_RATE,
+        timestampMillis: Long = System.currentTimeMillis()
+    ): PaperAccount {
+        val market = normalizeSymbol(symbol)
+        validateMarketPrice(bestBid, "bestBid")
+        validateFee(feeRate)
+        require(quantity.isFinite() && quantity > 0.0) { "Sell quantity must be positive" }
+        val position = account.positions[market]
+            ?: throw IllegalArgumentException("No virtual position for $market")
+        require(quantity <= position.quantity + 1e-12) { "Sell quantity exceeds available position" }
+
+        val actualQuantity = quantity.coerceAtMost(position.quantity)
+        val gross = actualQuantity * bestBid
+        val fee = gross * feeRate
+        val allocatedBasis = position.costBasis * (actualQuantity / position.quantity)
+        val pnl = gross - fee - allocatedBasis
+        require(gross.isFinite() && fee.isFinite() && pnl.isFinite()) { "Invalid sell calculation" }
+
+        val remainingQuantity = position.quantity - actualQuantity
+        val remainingBasis = (position.costBasis - allocatedBasis).coerceAtLeast(0.0)
+        val nextPositions = if (remainingQuantity <= 1e-12) {
+            account.positions - market
+        } else {
+            account.positions + (market to position.copy(
+                quantity = remainingQuantity,
+                costBasis = remainingBasis,
+                averageEntryPrice = remainingBasis / remainingQuantity
+            ))
+        }
+        val trade = PaperTrade(
+            id = timestampMillis,
+            symbol = market,
+            side = PaperSide.SELL,
+            quantity = actualQuantity,
+            price = bestBid,
+            fee = fee,
+            realizedPnl = pnl,
+            timestampMillis = timestampMillis
+        )
+        return account.copy(
+            cash = account.cash + gross - fee,
+            realizedPnl = account.realizedPnl + pnl,
+            positions = nextPositions,
+            trades = account.trades + trade
+        )
+    }
+
+    fun value(
+        account: PaperAccount,
+        bestBids: Map<String, Double>,
+        feeRate: Double = DEFAULT_FEE_RATE
+    ): PaperPortfolioValue {
+        validateFee(feeRate)
+        var marketValue = 0.0
+        var unrealized = 0.0
+        var unpriced = 0
+        account.positions.values.forEach { position ->
+            val bid = bestBids[position.symbol]
+            if (bid == null) {
+                unpriced++
+                return@forEach
+            }
+            validateMarketPrice(bid, "bestBid")
+            val proceeds = position.quantity * bid
+            marketValue += proceeds
+            unrealized += proceeds - proceeds * feeRate - position.costBasis
+        }
+        return PaperPortfolioValue(
+            cash = account.cash,
+            positionsValue = marketValue,
+            unrealizedPnl = unrealized,
+            realizedPnl = account.realizedPnl,
+            totalEquity = account.cash + marketValue - (marketValue * feeRate),
+            unpricedPositionCount = unpriced
+        )
+    }
+
+    private fun normalizeSymbol(symbol: String): String {
+        val normalized = symbol.trim().uppercase(java.util.Locale.ROOT)
+        require(normalized.matches(Regex("[A-Z0-9]{3,20}"))) { "Invalid market symbol" }
+        return normalized
+    }
+
+    private fun validateMarketPrice(price: Double, field: String) {
+        require(price.isFinite() && price > 0.0) { "$field must be positive and finite" }
+    }
+
+    private fun validateFee(rate: Double) {
+        require(rate.isFinite() && rate in 0.0..0.05) { "Fee rate must be between 0 and 5%" }
+    }
+}
+}{maxTotalInvestedPct}% cap preserves a cash reserve"
+        }
+        require(totalBudget <= account.cash + 1e-8) { "Insufficient virtual cash including fee" }
+        val quoteAmount = totalBudget / (1.0 + feeRate)
+        return buy(account, market, bestAsk, quoteAmount, feeRate, timestampMillis)
     }
 
     fun sell(

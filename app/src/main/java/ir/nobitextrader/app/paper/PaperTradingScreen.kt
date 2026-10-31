@@ -137,6 +137,15 @@ fun PaperTradingScreen(
                     (if (english) "Starting balance: " else "سرمایه اولیه: ") + money(account.initialCash),
                     style = MaterialTheme.typography.bodySmall
                 )
+                Text(
+                    if (english) {
+                        "Risk limits: max 25% of starting capital per symbol; max 80% total invested (20% cash reserve)."
+                    } else {
+                        "حد ریسک: حداکثر ۲۵٪ سرمایه اولیه برای هر نماد؛ حداکثر ۸۰٪ سرمایه در کل پوزیشن‌ها و حداقل ۲۰٪ ذخیره نقد."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
 
@@ -170,8 +179,31 @@ fun PaperTradingScreen(
             value = quoteAmount,
             onValueChange = { quoteAmount = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(if (english) "Buy amount (quote currency)" else "مبلغ خرید (ریال)") },
+            label = { Text(if (english) "Total buy budget including fee" else "کل بودجه خرید با احتساب کارمزد (ریال)") },
             singleLine = true
+        )
+        val enteredBudget = quoteAmount.trim().replace(",", "").toDoubleOrNull()
+        val estimatedFee = enteredBudget
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?.let { it - it / (1.0 + PaperTradingEngine.DEFAULT_FEE_RATE) }
+        val maximumSinglePositionBudget =
+            account.initialCash * PaperTradingEngine.DEFAULT_MAX_POSITION_CAPITAL_PCT / 100.0 -
+                (account.positions[symbol.trim().uppercase(Locale.ROOT)]?.costBasis ?: 0.0)
+        Text(
+            if (estimatedFee != null) {
+                (if (english) "Estimated fee (included): " else "کارمزد تخمینی (از همین مبلغ کسر می‌شود): ") +
+                    money(estimatedFee)
+            } else {
+                if (english) "Enter a valid total budget." else "مبلغ کل خرید را وارد کن."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            (if (english) "Remaining limit for this symbol: " else "سقف باقی‌مانده خرید این نماد: ") +
+                money(maximumSinglePositionBudget.coerceAtLeast(0.0)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Button(
             onClick = {
@@ -181,8 +213,19 @@ fun PaperTradingScreen(
                     error = if (english) "Refresh the market and enter a valid buy amount" else "قیمت زنده بگیر و مبلغ خرید معتبر وارد کن"
                 } else {
                     try {
-                        save(PaperTradingEngine.buy(account, book.symbol, book.bestAsk!!, amount))
-                        info = if (english) "Virtual buy filled at best ask" else "خرید مجازی با بهترین قیمت فروشنده ثبت شد"
+                        save(
+                            PaperTradingEngine.buyWithinBudget(
+                                account = account,
+                                symbol = book.symbol,
+                                bestAsk = book.bestAsk!!,
+                                totalBudget = amount
+                            )
+                        )
+                        info = if (english) {
+                            "Virtual buy filled. The entered budget included the fee and portfolio limits were enforced."
+                        } else {
+                            "خرید مجازی ثبت شد؛ کارمزد از مبلغ واردشده کسر شد و سقف ریسک پوزیشن رعایت شد."
+                        }
                         error = null
                     } catch (e: Exception) {
                         error = e.message
