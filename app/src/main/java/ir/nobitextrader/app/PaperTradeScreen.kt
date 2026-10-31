@@ -101,8 +101,8 @@ internal fun PaperTradeScreen(
                 Text(String.format(Locale.US, "%,.0f", portfolio.cash),
                     color = MaterialTheme.colorScheme.primary, fontSize = 22.sp)
                 Text(
-                    (if (english) "BTC quantity: " else "مقدار بیت‌کوین: ") +
-                        String.format(Locale.US, "%.8f", btcQty),
+                    (if (english) "Selected quantity: " else "مقدار نماد انتخابی: ") +
+                        String.format(Locale.US, "%.8f", selectedQuantity),
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
