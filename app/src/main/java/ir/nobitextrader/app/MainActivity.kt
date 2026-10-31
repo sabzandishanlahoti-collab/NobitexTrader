@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -119,6 +120,7 @@ private fun DashboardScreen(
     marketResult: MarketStats?,
     marketLoading: Boolean,
     marketError: String?,
+    marketUpdatedAt: Long?,
     scannerState: MarketScannerUiState,
     onOpenSettings: () -> Unit,
     onOpenScanner: () -> Unit,
@@ -251,13 +253,13 @@ private fun DashboardScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
-                        Text("▶ START", fontSize = 11.sp)
+                        Text(if (english) "▶ START" else "▶ شروع", fontSize = 11.sp)
                     }
                     OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
-                        Text("Ⅱ STOP", fontSize = 11.sp)
+                        Text(if (english) "Ⅱ STOP" else "Ⅱ توقف", fontSize = 11.sp)
                     }
                     OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
-                        Text("✕ KILL", fontSize = 11.sp)
+                        Text(if (english) "✕ KILL" else "✕ قطع اضطراری", fontSize = 11.sp)
                     }
                 }
                 Text(
@@ -458,9 +460,22 @@ private fun DashboardScreen(
                         Text(if (marketLoading) "…" else if (english) "REFRESH" else "بروزرسانی", fontSize = 11.sp)
                     }
                 }
-                if (marketResult == null) {
+                if (marketLoading && marketResult == null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.width(18.dp).height(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (english) "Loading public market data…" else "در حال دریافت داده عمومی بازار…",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
+                } else if (marketResult == null) {
                     Text(
-                        if (english) "No market snapshot loaded yet." else "هنوز اطلاعاتی از بازار دریافت نشده است.",
+                        if (english) "No public market snapshot is available. Check your connection and retry." else "داده‌ای از بازار دریافت نشده است. اتصال اینترنت را بررسی و دوباره تلاش کنید.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
@@ -477,9 +492,33 @@ private fun DashboardScreen(
                         fontSize = 11.sp
                     )
                     Text(
-                        (if (english) "24h change: " else "تغییر روزانه: ") + marketResult.dayChange + "%",
+                        (if (english) "24h change: " else "تغییر روزانه: ") +
+                            String.format(Locale.US, "%.2f%%", marketResult.dayChange),
                         color = if (marketResult.dayChange >= 0.0) AfaColorSchemes.profit else AfaColorSchemes.loss,
                         fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        (if (english) "24h range: " else "بازه ۲۴ ساعته: ") +
+                            String.format(Locale.US, "%,.0f – %,.0f", marketResult.dayLow, marketResult.dayHigh),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        if (english) {
+                            if (marketResult.isClosed) "Market status: CLOSED" else "Market status: OPEN"
+                        } else {
+                            if (marketResult.isClosed) "وضعیت بازار: بسته" else "وضعیت بازار: باز"
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                }
+                marketUpdatedAt?.let { updatedAt ->
+                    Text(
+                        (if (english) "Last successful update: " else "آخرین به‌روزرسانی موفق: ") +
+                            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(updatedAt)),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
                     )
                 }
                 marketError?.let {
@@ -491,18 +530,22 @@ private fun DashboardScreen(
         SectionPanel(
             title = if (english) "OPEN POSITIONS" else "پوزیشن‌های باز",
             subtitle = if (english) "Live filled positions will appear here" else "پوزیشن‌های واقعی پس از ثبت و تأیید معامله نمایش داده می‌شوند",
-            empty = if (english) "No verified positions to display." else "فعلاً پوزیشن تأییدشده‌ای برای نمایش وجود ندارد."
+            empty = if (english) "Private account is not connected. Positions are unavailable." else "حساب خصوصی متصل نیست؛ اطلاعات پوزیشن‌ها در دسترس نیست."
         )
         SectionPanel(
             title = if (english) "TRADE HISTORY" else "تاریخچه معاملات",
             subtitle = if (english) "BUY / SELL • PRICE • FEE • REALIZED P&L" else "خرید / فروش • قیمت • کارمزد • سود و زیان قطعی",
-            empty = if (english) "No completed trades recorded yet." else "هنوز معامله تکمیل‌شده‌ای ثبت نشده است."
+            empty = if (english) "Authenticated trade history is not connected." else "تاریخچه معاملات حساب هنوز به منبع احراز هویت‌شده متصل نیست."
         )
         OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
             Text(if (english) "SETTINGS" else "تنظیمات")
         }
         Text(
-            if (english) "Account balance, profit and trade history require verified authenticated exchange data." else "موجودی حساب، سود و تاریخچه معاملات به داده احراز هویت‌شده و تأییدشده صرافی نیاز دارند.",
+            if (english) {
+                "PUBLIC DATA ONLY • Account balances, transfers, positions and realized P&L remain unavailable until secure private-account access is implemented."
+            } else {
+                "فقط داده عمومی • موجودی، واریز و برداشت، پوزیشن‌ها و سود و زیان قطعی تا زمان پیاده‌سازی اتصال امن حساب خصوصی قابل دریافت نیستند."
+            },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 11.sp
         )
@@ -642,28 +685,23 @@ class MainActivity : ComponentActivity() {
             var marketError by remember {
                 mutableStateOf<String?>(null)
             }
-
-            var rawLoading by remember {
-                mutableStateOf(false)
-            }
-            var rawResponse by remember {
-                mutableStateOf<String?>(null)
-            }
-            var rawError by remember {
-                mutableStateOf<String?>(null)
+            var marketUpdatedAt by remember {
+                mutableStateOf<Long?>(null)
             }
 
-            var candlesLoading by remember {
-                mutableStateOf(false)
-            }
-            var candleCount by remember {
-                mutableStateOf<Int?>(null)
-            }
-            var lastCandleTime by remember {
-                mutableStateOf<String?>(null)
-            }
-            var candleError by remember {
-                mutableStateOf<String?>(null)
+            LaunchedEffect(screen) {
+                if (screen == AppScreen.HOME && marketResult == null && !marketLoading) {
+                    marketLoading = true
+                    marketError = null
+                    try {
+                        marketResult = NobitexMarketApi.fetchMarketStats()
+                        marketUpdatedAt = System.currentTimeMillis()
+                    } catch (e: Exception) {
+                        marketError = e.message ?: "Unknown market data error"
+                    } finally {
+                        marketLoading = false
+                    }
+                }
             }
 
             BackHandler(enabled = screen != AppScreen.HOME) {
@@ -731,6 +769,7 @@ class MainActivity : ComponentActivity() {
                                 marketResult = marketResult,
                                 marketLoading = marketLoading,
                                 marketError = marketError,
+                                marketUpdatedAt = marketUpdatedAt,
                                 scannerState = scannerState,
                                 onOpenSettings = { screen = AppScreen.SETTINGS },
                                 onOpenScanner = { screen = AppScreen.SCANNER },
@@ -741,6 +780,7 @@ class MainActivity : ComponentActivity() {
                                         marketError = null
                                         try {
                                             marketResult = NobitexMarketApi.fetchMarketStats()
+                                            marketUpdatedAt = System.currentTimeMillis()
                                         } catch (e: Exception) {
                                             marketError = e.message ?: "Unknown market data error"
                                         } finally {
