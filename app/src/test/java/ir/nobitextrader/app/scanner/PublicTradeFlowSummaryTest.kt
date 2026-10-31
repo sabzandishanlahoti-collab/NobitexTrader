@@ -59,6 +59,26 @@ class PublicTradeFlowSummaryTest {
     }
 
     @Test
+    fun recordsWhenPublicTradeDataWasFetched() {
+        val summary = PublicTradeFlowSummary.from(
+            trades = emptyList(),
+            fetchedAtMillis = 123_456L
+        )
+
+        assertEquals(123_456L, summary.fetchedAtMillis)
+    }
+
+    @Test
+    fun rejectsNonPositiveFetchTimestamp() {
+        assertIllegalArgument {
+            PublicTradeFlowSummary.from(
+                trades = emptyList(),
+                fetchedAtMillis = 0L
+            )
+        }
+    }
+
+    @Test
     fun summarizesFiniteBuyAndSellFlow() {
         val summary = PublicTradeFlowSummary.from(
             listOf(
