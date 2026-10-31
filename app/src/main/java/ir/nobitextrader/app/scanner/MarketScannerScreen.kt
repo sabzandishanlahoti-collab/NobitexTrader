@@ -377,7 +377,7 @@ fun MarketScannerScreen(
                 color = AfaColorSchemes.loss,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF2A1518), RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(10.dp))
                     .padding(10.dp)
             )
         }
@@ -571,11 +571,11 @@ private fun MarketResultCard(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = if (result.success) MaterialTheme.colorScheme.outline else Color(0xFF63343A),
+                color = if (result.success) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error,
                 shape = RoundedCornerShape(13.dp)
             ),
         colors = CardDefaults.cardColors(
-            containerColor = if (result.success) MaterialTheme.colorScheme.surface else Color(0xFF241518)
+            containerColor = if (result.success) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.errorContainer
         ),
         shape = RoundedCornerShape(13.dp)
     ) {
