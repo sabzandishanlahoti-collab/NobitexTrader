@@ -198,6 +198,7 @@ class MarketScannerViewModel(
             _uiState.value = _uiState.value.copy(
                 isScanning = true,
                 results = emptyList(),
+                rawResults = emptyList(),
                 errorMessage = null,
                 completedCount = 0,
                 totalCount = 0,
