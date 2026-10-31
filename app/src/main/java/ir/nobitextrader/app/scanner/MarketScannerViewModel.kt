@@ -365,6 +365,9 @@ class MarketScannerViewModel(
                 _uiState.value = _uiState.value.copy(
                     tradeFlowBySymbol = _uiState.value.tradeFlowBySymbol + (normalizedSymbol to summary)
                 )
+                // The combined buy-flow ranking depends on this newly loaded data.
+                // Re-sort immediately so the visible list does not remain stale.
+                refreshDisplayedResults()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
