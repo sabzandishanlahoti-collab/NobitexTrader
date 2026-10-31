@@ -174,8 +174,7 @@ class BacktestEngineTest {
     fun shortGapThroughStopSkipsStaleEntrySignal() {
         val candles = listOf(
             c(1, 100.0, 101.0, 99.0, 100.0),
-            c(2, 100.0, 101.0, 99.0, 100.0),
-            c(3, 110.0, 112.0, 109.0, 111.0)
+            c(2, 110.0, 112.0, 109.0, 111.0)
         )
         val result = BacktestEngine().run(candles, BacktestConfig(
             initialCapital = 10_000.0, positionNotional = 1_000.0,
