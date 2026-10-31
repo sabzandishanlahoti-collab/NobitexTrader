@@ -76,6 +76,21 @@ class NobitexOrderBookApiTest {
     }
 
     @Test
+    fun allMarketEntryMayOmitLastTradePriceForStatsMerge() {
+        val result = NobitexOrderBookApi.parseSnapshot(
+            "BTCIRT",
+            JSONObject(
+                """{"lastUpdate":1234,"bids":[[99,2]],"asks":[[101,1]]}"""
+            ),
+            requireLastTradePrice = false
+        )
+
+        assertTrue(result.lastTradePrice.isNaN())
+        assertEquals(99.0, result.bestBid!!, 0.0)
+        assertEquals(101.0, result.bestAsk!!, 0.0)
+    }
+
+    @Test
     fun missingOrInvalidLastTradePriceIsRejected() {
         assertIOException {
             snapshot("""{"bids":[[99,1]],"asks":[[101,1]]}""")
