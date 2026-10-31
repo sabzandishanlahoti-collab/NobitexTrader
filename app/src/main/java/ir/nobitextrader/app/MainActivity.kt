@@ -54,6 +54,7 @@ import ir.nobitextrader.app.data.NobitexMarketApi
 import ir.nobitextrader.app.scanner.MarketScannerScreen
 import ir.nobitextrader.app.scanner.MarketScannerUiState
 import ir.nobitextrader.app.scanner.MarketScannerViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -121,6 +122,7 @@ private fun DashboardScreen(
     marketLoading: Boolean,
     marketError: String?,
     marketUpdatedAt: Long?,
+    marketConnected: Boolean,
     scannerState: MarketScannerUiState,
     onOpenSettings: () -> Unit,
     onOpenScanner: () -> Unit,
@@ -135,6 +137,22 @@ private fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         AfaBrandHeader()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ConnectionStatusIndicator(
+                label = if (english) "NOBITEX DATA" else "داده نوبیتکس",
+                connected = marketConnected,
+                detail = if (english) "PUBLIC API" else "API عمومی"
+            )
+            ConnectionStatusIndicator(
+                label = if (english) "PRIVATE TRADING" else "معاملات حساب",
+                connected = false,
+                detail = if (english) "NOT AUTHENTICATED" else "احراز هویت نشده"
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -507,10 +525,20 @@ private fun DashboardScreen(
                     }
                 } else {
                     Text("BTC / IRT  •  ${marketResult.market}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    Text(
-                        (if (english) "Last: " else "آخرین قیمت: ") + marketResult.latest,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val rising = marketResult.dayChange >= 0.0
+                        Text(
+                            if (rising) "▲" else "▼",
+                            color = if (rising) AfaColorSchemes.profit else AfaColorSchemes.loss,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            (if (english) "Last: " else "آخرین قیمت: ") + String.format(Locale.US, "%,.0f", marketResult.latest),
+                            color = if (rising) AfaColorSchemes.profit else AfaColorSchemes.loss,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     Text(
                         (if (english) "Best bid: " else "بهترین خرید: ") + marketResult.bestBuy +
                             "     " + (if (english) "Best ask: " else "بهترین فروش: ") + marketResult.bestSell,
@@ -657,6 +685,37 @@ private fun TransferMetricCard(
 }
 
 @androidx.compose.runtime.Composable
+private fun ConnectionStatusIndicator(
+    label: String,
+    connected: Boolean,
+    detail: String
+) {
+    val statusColor = if (connected) AfaColorSchemes.profit else AfaColorSchemes.loss
+    Card(
+        modifier = Modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, statusColor.copy(alpha = 0.65f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Surface(
+                modifier = Modifier.width(8.dp).height(8.dp),
+                color = statusColor,
+                shape = RoundedCornerShape(50)
+            ) {}
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text(detail, color = statusColor, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
 private fun SectionPanel(title: String, subtitle: String, empty: String) {
     androidx.compose.material3.Card(
         modifier = Modifier.fillMaxWidth(),
@@ -714,18 +773,26 @@ class MainActivity : ComponentActivity() {
             var marketUpdatedAt by remember {
                 mutableStateOf<Long?>(null)
             }
+            var marketConnected by remember {
+                mutableStateOf(false)
+            }
 
             LaunchedEffect(screen) {
-                if (screen == AppScreen.HOME && marketResult == null && !marketLoading) {
-                    marketLoading = true
-                    marketError = null
-                    try {
-                        marketResult = NobitexMarketApi.fetchMarketStats()
-                        marketUpdatedAt = System.currentTimeMillis()
-                    } catch (e: Exception) {
-                        marketError = e.message ?: "Unknown market data error"
-                    } finally {
-                        marketLoading = false
+                if (screen == AppScreen.HOME) {
+                    while (true) {
+                        marketLoading = marketResult == null
+                        marketError = null
+                        try {
+                            marketResult = NobitexMarketApi.fetchMarketStats()
+                            marketUpdatedAt = System.currentTimeMillis()
+                            marketConnected = true
+                        } catch (e: Exception) {
+                            marketConnected = false
+                            marketError = e.message ?: "Unknown market data error"
+                        } finally {
+                            marketLoading = false
+                        }
+                        delay(15_000L)
                     }
                 }
             }
@@ -796,6 +863,7 @@ class MainActivity : ComponentActivity() {
                                 marketLoading = marketLoading,
                                 marketError = marketError,
                                 marketUpdatedAt = marketUpdatedAt,
+                                marketConnected = marketConnected,
                                 scannerState = scannerState,
                                 onOpenSettings = { screen = AppScreen.SETTINGS },
                                 onOpenScanner = { screen = AppScreen.SCANNER },
@@ -807,7 +875,9 @@ class MainActivity : ComponentActivity() {
                                         try {
                                             marketResult = NobitexMarketApi.fetchMarketStats()
                                             marketUpdatedAt = System.currentTimeMillis()
+                                            marketConnected = true
                                         } catch (e: Exception) {
+                                            marketConnected = false
                                             marketError = e.message ?: "Unknown market data error"
                                         } finally {
                                             marketLoading = false
