@@ -1,6 +1,7 @@
 
 package ir.nobitextrader.app.scanner
 
+import ir.nobitextrader.app.data.NobitexMarketApi
 import ir.nobitextrader.app.data.NobitexOrderBookApi
 import ir.nobitextrader.app.data.OrderBookSnapshot
 import java.io.IOException
@@ -61,7 +62,7 @@ object MarketScanner {
                     symbol = symbol,
                     timeoutMillis = policy.requestTimeoutMillis
                 )
-                val result = toScanResult(snapshot)
+                val result = toScanResult(snapshot, latestPrices[snapshot.symbol])
                 results.add(result)
                 onResult?.invoke(result)
             } catch (e: CancellationException) {
@@ -97,6 +98,19 @@ object MarketScanner {
             timeoutMillis = policy.requestTimeoutMillis,
             maxMarkets = policy.maxMarketsPerBatch
         )
+
+        // The official all-order-book example does not include
+        // lastTradePrice on every market. Fetch the public all-market
+        // stats once and merge its real latest prices by normalized symbol.
+        // If that endpoint is temporarily unavailable, snapshots that do
+        // contain lastTradePrice remain usable; missing prices stay invalid.
+        val latestPrices = try {
+            NobitexMarketApi.fetchAllLatestPrices(policy.requestTimeoutMillis)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            emptyMap()
+        }
 
         val validSnapshots = snapshots
             .filter { it.symbol.matches(symbolPattern) }
@@ -164,7 +178,8 @@ object MarketScanner {
     )
 
     private fun toScanResult(
-        snapshot: OrderBookSnapshot
+        snapshot: OrderBookSnapshot,
+        latestPriceOverride: Double? = null
     ): MarketScanResult {
         val bids = snapshot.bids
             .filter {
@@ -186,7 +201,9 @@ object MarketScanner {
 
         val bestBid = bids.firstOrNull()?.price ?: 0.0
         val bestAsk = asks.firstOrNull()?.price ?: 0.0
-        val lastPrice = snapshot.lastTradePrice
+        val lastPrice = latestPriceOverride
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?: snapshot.lastTradePrice
 
         val validBook = bestBid.isFinite() &&
             bestAsk.isFinite() &&
