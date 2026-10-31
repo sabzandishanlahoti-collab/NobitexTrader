@@ -29,8 +29,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -659,30 +657,7 @@ class MainActivity : ComponentActivity() {
                 screen = AppScreen.HOME
             }
 
-            MaterialTheme(
-                colorScheme = if (settings.darkTheme) {
-                    darkColorScheme(
-                        primary = Color(0xFF35DDE0),
-                        onPrimary = Color(0xFF00191B),
-                        secondary = Color(0xFF8CECEF),
-                        background = Color(0xFF070D18),
-                        surface = Color(0xFF101B2B),
-                        surfaceVariant = Color(0xFF19283A),
-                        onBackground = Color(0xFFEAFBFC),
-                        onSurface = Color(0xFFEAFBFC),
-                        onSurfaceVariant = Color(0xFFA9C2CC)
-                    )
-                } else {
-                    lightColorScheme(
-                        primary = Color(0xFF008F98),
-                        secondary = Color(0xFF087E88),
-                        background = Color(0xFFF3FAFB),
-                        surface = Color(0xFFFFFFFF),
-                        onBackground = Color(0xFF102329),
-                        onSurface = Color(0xFF102329)
-                    )
-                }
-            ) {
+            AfaTheme(darkTheme = settings.darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
