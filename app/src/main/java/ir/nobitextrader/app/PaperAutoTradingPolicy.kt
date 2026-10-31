@@ -18,7 +18,6 @@ internal object PaperAutoTradingPolicy {
         portfolio: PaperPortfolio,
         feeRate: Double,
         orderBudgetIrr: Double,
-        marketObservedAtMillis: Long,
         nowMillis: Long,
         maxMarketAgeMillis: Long = DEFAULT_MAX_MARKET_AGE_MS,
         maxSpreadPercent: Double = DEFAULT_MAX_SPREAD_PERCENT
@@ -32,6 +31,7 @@ internal object PaperAutoTradingPolicy {
             return reject("Strategy and market symbols do not match")
         }
         if (!market.success) return reject(market.error ?: "Market data request failed")
+        val marketObservedAtMillis = market.observedAtMillis
         if (marketObservedAtMillis <= 0L || nowMillis < marketObservedAtMillis) {
             return reject("Invalid market observation timestamp")
         }
