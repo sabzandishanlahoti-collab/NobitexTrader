@@ -16,12 +16,13 @@ class RiskEngineSafetyTest {
         marketDataValid: Boolean = true,
         liquiditySufficient: Boolean = true,
         spread: Double = 0.1,
-        openRisk: Double = 0.0
+        openRisk: Double = 0.0,
+        freeCapital: Double = 5_000.0
     ) = RiskRequest(
         equityUsd = equity,
         peakEquityUsd = peakEquity,
         dayStartEquityUsd = dayStartEquity,
-        freeCapitalUsd = 5_000.0,
+        freeCapitalUsd = freeCapital,
         openRiskUsd = openRisk,
         stopLossPct = 2.0,
         estimatedRoundTripCostsPct = 0.2,
@@ -96,6 +97,65 @@ class RiskEngineSafetyTest {
 
         assertTrue(result.approved)
         assertTrue(result.positionSizeUsd <= 5_000.0)
+    }
+
+
+    @Test
+    fun protectiveDrawdownModeHalvesThePerTradeRiskBudget() {
+        val result = RiskEngine().evaluate(
+            validRequest(
+                equity = 9_300.0,
+                peakEquity = 10_000.0,
+                dayStartEquity = 9_300.0
+            )
+        )
+
+        assertTrue(result.approved)
+        assertTrue(result.protectiveMode)
+        assertEquals(23.25, result.riskBudgetUsd, 0.000001)
+    }
+
+    @Test
+    fun remainingOpenRiskAllowanceCapsTheNextTradeBudget() {
+        val result = RiskEngine().evaluate(
+            validRequest(openRisk = 110.0)
+        )
+
+        assertTrue(result.approved)
+        assertEquals(40.0, result.riskBudgetUsd, 0.000001)
+        assertTrue(result.reason.contains("reduced size"))
+    }
+
+    @Test
+    fun exhaustedTotalOpenRiskAllowanceRejectsTrade() {
+        val result = RiskEngine().evaluate(
+            validRequest(openRisk = 150.0)
+        )
+
+        assertFalse(result.approved)
+        assertTrue(result.reason.contains("open-risk"))
+    }
+
+    @Test
+    fun positionCapitalLimitCapsCalculatedPositionSize() {
+        val engine = RiskEngine(
+            RiskConfig(maxPositionCapitalPct = 5.0)
+        )
+
+        val result = engine.evaluate(validRequest())
+
+        assertTrue(result.approved)
+        assertEquals(500.0, result.positionSizeUsd, 0.000001)
+    }
+
+    @Test
+    fun freeCapitalAboveEquityIsRejected() {
+        val result = RiskEngine().evaluate(
+            validRequest(freeCapital = 10_001.0)
+        )
+
+        assertFalse(result.approved)
+        assertTrue(result.reason.contains("exceeds account equity"))
     }
 
     @Test
