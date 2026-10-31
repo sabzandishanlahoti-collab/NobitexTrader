@@ -73,7 +73,13 @@ object NobitexCandlesApi {
                 )
             }
 
-            parseResponse(body)
+            val candles = parseResponse(body)
+            CandleSeriesValidator.validate(
+                candles = candles,
+                resolution = resolution,
+                nowUnixSeconds = System.currentTimeMillis() / 1_000L
+            )
+            candles
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
@@ -199,4 +205,78 @@ object NobitexCandlesApi {
 
     private fun encode(value: String): String =
         URLEncoder.encode(value, Charsets.UTF_8.name())
+}
+
+
+/**
+ * Validates candle continuity and freshness before the data reaches strategies.
+ *
+ * The public UDF API documents timestamps in Unix seconds and supported
+ * resolutions. A gap is rejected conservatively: the strategy layer must not
+ * silently treat a discontinuous history as a complete indicator window.
+ */
+internal object CandleSeriesValidator {
+    const val MINIMUM_CANDLES = 20
+
+    fun validate(
+        candles: List<Candle>,
+        resolution: String,
+        nowUnixSeconds: Long,
+        minimumCandles: Int = MINIMUM_CANDLES
+    ) {
+        require(nowUnixSeconds > 0L) { "Current time must be positive" }
+        require(minimumCandles > 0) { "Minimum candle count must be positive" }
+
+        if (candles.isEmpty()) return
+
+        val intervalSeconds = intervalSeconds(resolution)
+        require(candles.size >= minimumCandles) {
+            "Insufficient candle history: expected at least $minimumCandles, received ${candles.size}"
+        }
+
+        var previousSeconds: Long? = null
+        candles.forEachIndexed { index, candle ->
+            require(candle.isValid()) { "Invalid candle at index $index" }
+            require(candle.timestampMillis > 0L && candle.timestampMillis % 1_000L == 0L) {
+                "Invalid candle timestamp at index $index"
+            }
+            val timestampSeconds = candle.timestampMillis / 1_000L
+            previousSeconds?.let { previous ->
+                require(timestampSeconds > previous) {
+                    "Duplicate or non-chronological candle timestamp at index $index"
+                }
+                require(timestampSeconds - previous == intervalSeconds) {
+                    "Candle interval gap at index $index: expected $intervalSeconds seconds"
+                }
+            }
+            previousSeconds = timestampSeconds
+        }
+
+        val latestSeconds = candles.last().timestampMillis / 1_000L
+        require(latestSeconds <= nowUnixSeconds) {
+            "Latest candle timestamp is in the future"
+        }
+        require(latestSeconds + intervalSeconds <= nowUnixSeconds) {
+            "Latest candle is not fully closed"
+        }
+        require(nowUnixSeconds - latestSeconds <= intervalSeconds * 3L) {
+            "Candle history is stale"
+        }
+    }
+
+    internal fun intervalSeconds(resolution: String): Long = when (resolution.trim()) {
+        "1" -> 60L
+        "5" -> 300L
+        "15" -> 900L
+        "30" -> 1_800L
+        "60" -> 3_600L
+        "180" -> 10_800L
+        "240" -> 14_400L
+        "360" -> 21_600L
+        "720" -> 43_200L
+        "D", "1D" -> 86_400L
+        "2D" -> 172_800L
+        "3D" -> 259_200L
+        else -> throw IllegalArgumentException("Unsupported candle resolution: $resolution")
+    }
 }

@@ -12,7 +12,8 @@ object MarketRanking {
     fun rank(
         results: List<MarketScanResult>,
         mode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY,
-        tradeFlowBySymbol: Map<String, PublicTradeFlowSummary> = emptyMap()
+        tradeFlowBySymbol: Map<String, PublicTradeFlowSummary> = emptyMap(),
+        nowMillis: Long = System.currentTimeMillis()
     ): List<MarketScanResult> {
         val successful = results.filter { it.success }
         val failed = results.filterNot { it.success }
@@ -48,7 +49,7 @@ object MarketRanking {
                 )
 
             MarketSortMode.COMBINED_BUY_FLOW_HIGH_TO_LOW ->
-                rankCombinedBuyFlow(successful, tradeFlowBySymbol)
+                rankCombinedBuyFlow(successful, tradeFlowBySymbol, nowMillis)
 
             MarketSortMode.BALANCED_PRIORITY ->
                 rankBalanced(successful)
@@ -60,11 +61,15 @@ object MarketRanking {
 
     private fun rankCombinedBuyFlow(
         results: List<MarketScanResult>,
-        flows: Map<String, PublicTradeFlowSummary>
+        flows: Map<String, PublicTradeFlowSummary>,
+        nowMillis: Long
     ): List<MarketScanResult> {
         val withRealTrades = results.filter { result ->
             flows[result.symbol]?.let { flow ->
-                flow.buyCount + flow.sellCount > 0 &&
+                val ageMillis = nowMillis - flow.fetchedAtMillis
+                flow.fetchedAtMillis > 0L &&
+                    ageMillis in 0L..PUBLIC_TRADE_FLOW_MAX_AGE_MILLIS &&
+                    flow.buyCount + flow.sellCount > 0 &&
                     flow.buyQuoteVolume.isFinite() && flow.buyQuoteVolume >= 0.0 &&
                     flow.sellQuoteVolume.isFinite() && flow.sellQuoteVolume >= 0.0
             } == true
@@ -131,3 +136,6 @@ object MarketRanking {
     private fun safeNonNegative(value: Double): Double =
         if (value.isFinite() && value >= 0.0) value else Double.MAX_VALUE
 }
+
+
+private const val PUBLIC_TRADE_FLOW_MAX_AGE_MILLIS = 120_000L

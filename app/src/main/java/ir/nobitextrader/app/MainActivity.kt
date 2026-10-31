@@ -29,9 +29,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,7 +69,11 @@ private enum class AppScreen {
 @androidx.compose.runtime.Composable
 private fun AfaBrandHeader() {
     androidx.compose.foundation.layout.Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -80,10 +83,10 @@ private fun AfaBrandHeader() {
             fontFamily = FontFamily.Cursive,
             fontStyle = FontStyle.Italic,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF35DDE0),
+            color = MaterialTheme.colorScheme.primary,
             style = TextStyle(
                 shadow = Shadow(
-                    color = Color(0xFF00DDE8).copy(alpha = 0.85f),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
                     offset = Offset.Zero,
                     blurRadius = 18f
                 )
@@ -91,16 +94,16 @@ private fun AfaBrandHeader() {
         )
         Spacer(modifier = Modifier.width(5.dp))
         Text(
-            text = "NOBITEX. TRADER.AFA.ESNIPER",
-            maxLines = 1,
-            softWrap = false,
+            text = "NOBITEX TRADER  A.F.A SNIPER",
+            maxLines = 2,
+            softWrap = true,
             fontSize = 14.sp,
             letterSpacing = (-0.45).sp,
             fontWeight = FontWeight.ExtraBold,
-            color = Color(0xFFEAFBFC),
+            color = MaterialTheme.colorScheme.onSurface,
             style = TextStyle(
                 shadow = Shadow(
-                    color = Color(0xFF35DDE0).copy(alpha = 0.55f),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
                     offset = Offset.Zero,
                     blurRadius = 9f
                 )
@@ -110,11 +113,6 @@ private fun AfaBrandHeader() {
 }
 
 
-private val AfaCyan = Color(0xFF35DDE0)
-private val AfaPanel = Color(0xFF101B2B)
-private val AfaMuted = Color(0xFFA9C2CC)
-private val AfaProfit = Color(0xFF35D6B0)
-private val AfaLoss = Color(0xFFFF647C)
 
 @androidx.compose.runtime.Composable
 private fun DashboardScreen(
@@ -122,6 +120,7 @@ private fun DashboardScreen(
     marketResult: MarketStats?,
     marketLoading: Boolean,
     marketError: String?,
+    marketUpdatedAt: Long?,
     scannerState: MarketScannerUiState,
     onOpenSettings: () -> Unit,
     onOpenScanner: () -> Unit,
@@ -149,8 +148,8 @@ private fun DashboardScreen(
                     fontSize = 18.sp
                 )
                 Text(
-                    if (english) "NOBITEX • AFA ESNIPER" else "نوبیتکس • آفا اسنایپر",
-                    color = AfaMuted,
+                    if (english) "NOBITEX • AFA SNIPER" else "نوبیتکس • آفا اسنایپر",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
             }
@@ -163,7 +162,7 @@ private fun DashboardScreen(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 if (english) "ACCOUNT OVERVIEW" else "نمای کلی سرمایه",
-                color = AfaCyan,
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -171,13 +170,13 @@ private fun DashboardScreen(
                 MetricCard(
                     title = if (english) "INITIAL CAPITAL" else "سرمایه اولیه",
                     value = "—",
-                    accent = AfaCyan,
+                    accent = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
                     title = if (english) "IN POSITIONS" else "سرمایه در گردش",
                     value = "—",
-                    accent = AfaCyan,
+                    accent = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -185,22 +184,43 @@ private fun DashboardScreen(
                 MetricCard(
                     title = if (english) "NET PROFIT" else "سود خالص",
                     value = "—",
-                    accent = AfaProfit,
+                    accent = AfaColorSchemes.profit,
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
                     title = if (english) "NET LOSS" else "ضرر خالص",
                     value = "—",
-                    accent = AfaLoss,
+                    accent = AfaColorSchemes.loss,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TransferMetricCard(
+                title = if (english) "DEPOSITS" else "واریزها",
+                value = "—",
+                caption = if (english) "Verified account records" else "سوابق تأییدشده حساب",
+                accent = AfaColorSchemes.profit,
+                modifier = Modifier.weight(1f)
+            )
+            TransferMetricCard(
+                title = if (english) "WITHDRAWALS" else "برداشت‌ها",
+                value = "—",
+                caption = if (english) "Verified account records" else "سوابق تأییدشده حساب",
+                accent = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
         androidx.compose.material3.Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AfaPanel),
-            shape = RoundedCornerShape(18.dp)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(18.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -213,47 +233,48 @@ private fun DashboardScreen(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Surface(
-                        color = Color(0xFF4B3B20),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
                         shape = RoundedCornerShape(50)
                     ) {
                         Text(
                             if (english) "NOT CONNECTED" else "اتصال اجرا برقرار نیست",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            color = Color(0xFFFFD18A),
-                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Spacer(Modifier.width(8.dp))
                     Text(
                         if (english) "Order execution is not enabled" else "ثبت سفارش هنوز فعال نشده است",
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
-                        Text("▶ START", fontSize = 11.sp)
+                        Text(if (english) "▶ START" else "▶ شروع", fontSize = 11.sp)
                     }
                     OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
-                        Text("Ⅱ STOP", fontSize = 11.sp)
+                        Text(if (english) "Ⅱ STOP" else "Ⅱ توقف", fontSize = 11.sp)
                     }
                     OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
-                        Text("✕ KILL", fontSize = 11.sp)
+                        Text(if (english) "✕ KILL" else "✕ قطع اضطراری", fontSize = 11.sp)
                     }
                 }
                 Text(
                     if (english) "Controls unlock only after verified private API, order state and emergency-close tests." else "این کلیدها پس از تکمیل و آزمایش API خصوصی، وضعیت سفارش‌ها و توقف اضطراری فعال می‌شوند.",
-                    color = AfaMuted,
-                    fontSize = 10.sp
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
                 )
             }
         }
 
         androidx.compose.material3.Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AfaPanel),
-            shape = RoundedCornerShape(18.dp)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(18.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -272,11 +293,11 @@ private fun DashboardScreen(
                         )
                         Text(
                             if (english) "Independent full-screen scanner" else "اسکنر مستقل در صفحه تمام‌صفحه",
-                            color = AfaMuted,
-                            fontSize = 10.sp
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
                         )
                     }
-                    Text("◎", color = AfaCyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    Text("◎", color = MaterialTheme.colorScheme.primary, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
@@ -303,6 +324,20 @@ private fun DashboardScreen(
                         )
                     }
                 }
+                Text(
+                    if (scannerState.autoRefreshEnabled) {
+                        if (english) {
+                            "AUTO SCAN ON • every ${scannerState.refreshIntervalMs / 1_000L}s"
+                        } else {
+                            "اسکن خودکار روشن • هر ${scannerState.refreshIntervalMs / 1_000L} ثانیه"
+                        }
+                    } else {
+                        if (english) "AUTO SCAN OFF • manual scans only" else "اسکن خودکار خاموش • فقط اسکن دستی"
+                    },
+                    color = if (scannerState.autoRefreshEnabled) AfaColorSchemes.profit else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
                 if (scannerState.isScanning || scannerState.totalCount > 0) {
                     Text(
                         if (english) {
@@ -310,20 +345,18 @@ private fun DashboardScreen(
                         } else {
                             "پیشرفت: ${scannerState.completedCount} / ${scannerState.totalCount}"
                         },
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                 }
-                if (scannerState.results.isNotEmpty()) {
-                    val successful = scannerState.results.count { it.success }
-                    val failed = scannerState.results.size - successful
+                if (scannerState.totalCount > 0 || scannerState.results.isNotEmpty()) {
                     Text(
                         if (english) {
-                            "Valid books: $successful   •   Failed: $failed"
+                            "Valid books: ${scannerState.successfulCount}   •   Failed: ${scannerState.failedCount}"
                         } else {
-                            "دفتر سفارش معتبر: $successful   •   ناموفق: $failed"
+                            "دفتر سفارش معتبر: ${scannerState.successfulCount}   •   ناموفق: ${scannerState.failedCount}"
                         },
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                     scannerState.results
@@ -337,30 +370,37 @@ private fun DashboardScreen(
                             ) {
                                 Text(
                                     result.symbol,
-                                    color = AfaCyan,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
                                     (if (english) "Spread " else "اختلاف ") +
                                         String.format(Locale.US, "%.3f%%", result.spreadPercent),
-                                    color = AfaMuted,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 11.sp
                                 )
                             }
                         }
+                } else if (!scannerState.isScanning) {
+                    Text(
+                        if (english) "No scan results yet. Run a scan to populate this panel."
+                        else "هنوز نتیجه‌ای ثبت نشده؛ برای تکمیل این بخش اسکن بازار را اجرا کنید.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
                 }
                 scannerState.errorMessage?.let { message ->
-                    Text(message, color = AfaLoss, fontSize = 11.sp)
+                    Text(message, color = AfaColorSchemes.loss, fontSize = 11.sp)
                 }
                 val analyzedMarkets = scannerState.analysisBySymbol.entries
                     .filter { it.value.result != null || it.value.error != null || it.value.isLoading }
                     .take(4)
                 if (analyzedMarkets.isNotEmpty()) {
-                    HorizontalDivider(color = Color(0xFF29404E))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Text(
                         if (english) "STRATEGY ANALYSIS" else "خلاصه تحلیل استراتژی",
-                        color = AfaCyan,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp
                     )
@@ -373,10 +413,10 @@ private fun DashboardScreen(
                             else -> if (english) "NO TRADE" else "بدون معامله"
                         }
                         val statusColor = when {
-                            analysisState.isLoading -> AfaMuted
-                            analysisState.error != null -> AfaLoss
-                            decision?.isActionable == true -> AfaProfit
-                            else -> Color(0xFFFFC66D)
+                            analysisState.isLoading -> MaterialTheme.colorScheme.onSurfaceVariant
+                            analysisState.error != null -> AfaColorSchemes.loss
+                            decision?.isActionable == true -> AfaColorSchemes.profit
+                            else -> AfaColorSchemes.warning
                         }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -384,14 +424,14 @@ private fun DashboardScreen(
                         ) {
                             Text(
                                 symbol,
-                                color = AfaCyan,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 status,
                                 color = statusColor,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -401,15 +441,15 @@ private fun DashboardScreen(
                                     decision.agreeingStrategyIds.size +
                                     " • " +
                                     String.format(Locale.US, "%.1f%%", decision.confidence * 100.0),
-                                color = AfaMuted,
-                                fontSize = 9.sp
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp
                             )
                         }
                     }
                     Text(
                         if (english) "Analysis signals only — no order has been placed." else "این‌ها فقط خروجی تحلیل هستند؛ هیچ سفارشی ثبت نشده است.",
-                        color = AfaMuted,
-                        fontSize = 9.sp
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
                     )
                 }
             }
@@ -417,8 +457,9 @@ private fun DashboardScreen(
 
         androidx.compose.material3.Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AfaPanel),
-            shape = RoundedCornerShape(18.dp)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(18.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -435,17 +476,37 @@ private fun DashboardScreen(
                         fontWeight = FontWeight.Bold
                     )
                     OutlinedButton(onClick = onRefreshMarket, enabled = !marketLoading) {
-                        Text(if (marketLoading) "…" else if (english) "REFRESH" else "بروزرسانی", fontSize = 10.sp)
+                        Text(if (marketLoading) "…" else if (english) "REFRESH" else "بروزرسانی", fontSize = 11.sp)
+                    }
+                }
+                if (marketLoading) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.width(18.dp).height(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (marketResult == null) {
+                                if (english) "Loading public market data…" else "در حال دریافت داده عمومی بازار…"
+                            } else {
+                                if (english) "Refreshing public market data…" else "در حال بروزرسانی داده بازار…"
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
                     }
                 }
                 if (marketResult == null) {
-                    Text(
-                        if (english) "No market snapshot loaded yet." else "هنوز اطلاعاتی از بازار دریافت نشده است.",
-                        color = AfaMuted,
-                        fontSize = 12.sp
-                    )
+                    if (!marketLoading) {
+                        Text(
+                            if (english) "No public market snapshot is available. Check your connection and retry." else "داده‌ای از بازار دریافت نشده است. اتصال اینترنت را بررسی و دوباره تلاش کنید.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
                 } else {
-                    Text("BTC / IRT  •  ${marketResult.market}", color = AfaCyan, fontWeight = FontWeight.Bold)
+                    Text("BTC / IRT  •  ${marketResult.market}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     Text(
                         (if (english) "Last: " else "آخرین قیمت: ") + marketResult.latest,
                         color = MaterialTheme.colorScheme.onSurface
@@ -453,17 +514,41 @@ private fun DashboardScreen(
                     Text(
                         (if (english) "Best bid: " else "بهترین خرید: ") + marketResult.bestBuy +
                             "     " + (if (english) "Best ask: " else "بهترین فروش: ") + marketResult.bestSell,
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                     Text(
-                        (if (english) "24h change: " else "تغییر روزانه: ") + marketResult.dayChange + "%",
-                        color = if (marketResult.dayChange >= 0.0) AfaProfit else AfaLoss,
+                        (if (english) "24h change: " else "تغییر روزانه: ") +
+                            String.format(Locale.US, "%.2f%%", marketResult.dayChange),
+                        color = if (marketResult.dayChange >= 0.0) AfaColorSchemes.profit else AfaColorSchemes.loss,
                         fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        (if (english) "24h range: " else "بازه ۲۴ ساعته: ") +
+                            String.format(Locale.US, "%,.0f – %,.0f", marketResult.dayLow, marketResult.dayHigh),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        if (english) {
+                            if (marketResult.isClosed) "Market status: CLOSED" else "Market status: OPEN"
+                        } else {
+                            if (marketResult.isClosed) "وضعیت بازار: بسته" else "وضعیت بازار: باز"
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                }
+                marketUpdatedAt?.let { updatedAt ->
+                    Text(
+                        (if (english) "Last successful update: " else "آخرین به‌روزرسانی موفق: ") +
+                            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(updatedAt)),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
                     )
                 }
                 marketError?.let {
-                    Text(it, color = AfaLoss, fontSize = 11.sp)
+                    Text(it, color = AfaColorSchemes.loss, fontSize = 11.sp)
                 }
             }
         }
@@ -471,20 +556,24 @@ private fun DashboardScreen(
         SectionPanel(
             title = if (english) "OPEN POSITIONS" else "پوزیشن‌های باز",
             subtitle = if (english) "Live filled positions will appear here" else "پوزیشن‌های واقعی پس از ثبت و تأیید معامله نمایش داده می‌شوند",
-            empty = if (english) "No verified positions to display." else "فعلاً پوزیشن تأییدشده‌ای برای نمایش وجود ندارد."
+            empty = if (english) "Private account is not connected. Positions are unavailable." else "حساب خصوصی متصل نیست؛ اطلاعات پوزیشن‌ها در دسترس نیست."
         )
         SectionPanel(
             title = if (english) "TRADE HISTORY" else "تاریخچه معاملات",
             subtitle = if (english) "BUY / SELL • PRICE • FEE • REALIZED P&L" else "خرید / فروش • قیمت • کارمزد • سود و زیان قطعی",
-            empty = if (english) "No completed trades recorded yet." else "هنوز معامله تکمیل‌شده‌ای ثبت نشده است."
+            empty = if (english) "Authenticated trade history is not connected." else "تاریخچه معاملات حساب هنوز به منبع احراز هویت‌شده متصل نیست."
         )
         OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
             Text(if (english) "SETTINGS" else "تنظیمات")
         }
         Text(
-            if (english) "Account balance, profit and trade history require verified authenticated exchange data." else "موجودی حساب، سود و تاریخچه معاملات به داده احراز هویت‌شده و تأییدشده صرافی نیاز دارند.",
-            color = AfaMuted,
-            fontSize = 10.sp
+            if (english) {
+                "PUBLIC DATA ONLY • Account balances, transfers, positions and realized P&L remain unavailable until secure private-account access is implemented."
+            } else {
+                "فقط داده عمومی • موجودی، واریز و برداشت، پوزیشن‌ها و سود و زیان قطعی تا زمان پیاده‌سازی اتصال امن حساب خصوصی قابل دریافت نیستند."
+            },
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp
         )
     }
 }
@@ -498,15 +587,71 @@ private fun MetricCard(
 ) {
     androidx.compose.material3.Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = AfaPanel),
-        shape = RoundedCornerShape(15.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(15.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Text(title, color = AfaMuted, fontSize = 10.sp, maxLines = 1)
-            Text(value, color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 23.sp)
+            Text(
+                title,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 2
+            )
+            Text(
+                value,
+                color = accent,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun TransferMetricCard(
+    title: String,
+    value: String,
+    caption: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(15.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                title,
+                color = accent,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2
+            )
+            Text(
+                value,
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1
+            )
+            Text(
+                caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2
+            )
         }
     }
 }
@@ -515,17 +660,18 @@ private fun MetricCard(
 private fun SectionPanel(title: String, subtitle: String, empty: String) {
     androidx.compose.material3.Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = AfaPanel),
-        shape = RoundedCornerShape(18.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = AfaCyan, fontSize = 9.sp)
-            HorizontalDivider(color = Color(0xFF29404E))
-            Text(empty, color = AfaMuted, fontSize = 11.sp)
+            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text(empty, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -565,28 +711,23 @@ class MainActivity : ComponentActivity() {
             var marketError by remember {
                 mutableStateOf<String?>(null)
             }
-
-            var rawLoading by remember {
-                mutableStateOf(false)
-            }
-            var rawResponse by remember {
-                mutableStateOf<String?>(null)
-            }
-            var rawError by remember {
-                mutableStateOf<String?>(null)
+            var marketUpdatedAt by remember {
+                mutableStateOf<Long?>(null)
             }
 
-            var candlesLoading by remember {
-                mutableStateOf(false)
-            }
-            var candleCount by remember {
-                mutableStateOf<Int?>(null)
-            }
-            var lastCandleTime by remember {
-                mutableStateOf<String?>(null)
-            }
-            var candleError by remember {
-                mutableStateOf<String?>(null)
+            LaunchedEffect(screen) {
+                if (screen == AppScreen.HOME && marketResult == null && !marketLoading) {
+                    marketLoading = true
+                    marketError = null
+                    try {
+                        marketResult = NobitexMarketApi.fetchMarketStats()
+                        marketUpdatedAt = System.currentTimeMillis()
+                    } catch (e: Exception) {
+                        marketError = e.message ?: "Unknown market data error"
+                    } finally {
+                        marketLoading = false
+                    }
+                }
             }
 
             BackHandler(enabled = screen != AppScreen.HOME) {
@@ -598,30 +739,7 @@ class MainActivity : ComponentActivity() {
                 screen = AppScreen.HOME
             }
 
-            MaterialTheme(
-                colorScheme = if (settings.darkTheme) {
-                    darkColorScheme(
-                        primary = Color(0xFF35DDE0),
-                        onPrimary = Color(0xFF00191B),
-                        secondary = Color(0xFF8CECEF),
-                        background = Color(0xFF070D18),
-                        surface = Color(0xFF101B2B),
-                        surfaceVariant = Color(0xFF19283A),
-                        onBackground = Color(0xFFEAFBFC),
-                        onSurface = Color(0xFFEAFBFC),
-                        onSurfaceVariant = Color(0xFFA9C2CC)
-                    )
-                } else {
-                    lightColorScheme(
-                        primary = Color(0xFF008F98),
-                        secondary = Color(0xFF087E88),
-                        background = Color(0xFFF3FAFB),
-                        surface = Color(0xFFFFFFFF),
-                        onBackground = Color(0xFF102329),
-                        onSurface = Color(0xFF102329)
-                    )
-                }
-            ) {
+            AfaTheme(darkTheme = settings.darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -677,6 +795,7 @@ class MainActivity : ComponentActivity() {
                                 marketResult = marketResult,
                                 marketLoading = marketLoading,
                                 marketError = marketError,
+                                marketUpdatedAt = marketUpdatedAt,
                                 scannerState = scannerState,
                                 onOpenSettings = { screen = AppScreen.SETTINGS },
                                 onOpenScanner = { screen = AppScreen.SCANNER },
@@ -687,6 +806,7 @@ class MainActivity : ComponentActivity() {
                                         marketError = null
                                         try {
                                             marketResult = NobitexMarketApi.fetchMarketStats()
+                                            marketUpdatedAt = System.currentTimeMillis()
                                         } catch (e: Exception) {
                                             marketError = e.message ?: "Unknown market data error"
                                         } finally {

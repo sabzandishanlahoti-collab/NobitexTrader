@@ -97,6 +97,54 @@ class MarketRankingTest {
     }
 
     @Test
+    fun combinedBuyFlowIgnoresDataOlderThanTwoMinutes() {
+        val now = 1_000_000L
+        val flows = mapOf(
+            "FRESH" to PublicTradeFlowSummary(
+                buyCount = 10, sellCount = 0,
+                buyQuoteVolume = 1_000.0, sellQuoteVolume = 0.0,
+                netQuoteFlow = 1_000.0, latestTradeTimeMillis = now,
+                fetchedAtMillis = now
+            ),
+            "STALE" to PublicTradeFlowSummary(
+                buyCount = 10, sellCount = 0,
+                buyQuoteVolume = 100_000.0, sellQuoteVolume = 0.0,
+                netQuoteFlow = 100_000.0, latestTradeTimeMillis = now - 121_000L,
+                fetchedAtMillis = now - 121_000L
+            )
+        )
+
+        val ranked = MarketRanking.rank(
+            results = listOf(result("STALE"), result("FRESH")),
+            mode = MarketSortMode.COMBINED_BUY_FLOW_HIGH_TO_LOW,
+            tradeFlowBySymbol = flows,
+            nowMillis = now
+        )
+
+        assertEquals(listOf("FRESH", "STALE"), ranked.map { it.symbol })
+    }
+
+    @Test
+    fun combinedBuyFlowIgnoresFutureDatedFetchTimestamp() {
+        val now = 1_000_000L
+        val futureFlow = PublicTradeFlowSummary(
+            buyCount = 10, sellCount = 0,
+            buyQuoteVolume = 1_000_000.0, sellQuoteVolume = 0.0,
+            netQuoteFlow = 1_000_000.0, latestTradeTimeMillis = now + 1L,
+            fetchedAtMillis = now + 1L
+        )
+
+        val ranked = MarketRanking.rank(
+            results = listOf(result("FUTURE"), result("NO_DATA")),
+            mode = MarketSortMode.COMBINED_BUY_FLOW_HIGH_TO_LOW,
+            tradeFlowBySymbol = mapOf("FUTURE" to futureFlow),
+            nowMillis = now
+        )
+
+        assertEquals(listOf("FUTURE", "NO_DATA"), ranked.map { it.symbol })
+    }
+
+    @Test
     fun emptyAndSingleItemInputsAreSafe() {
         assertTrue(MarketRanking.rank(emptyList()).isEmpty())
         assertEquals(

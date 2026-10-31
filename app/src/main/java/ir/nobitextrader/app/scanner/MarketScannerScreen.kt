@@ -1,5 +1,7 @@
 package ir.nobitextrader.app.scanner
 
+import ir.nobitextrader.app.AfaColorSchemes
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -35,15 +37,6 @@ import androidx.compose.ui.unit.sp
 import ir.nobitextrader.app.TraderSettingsStore
 import java.util.Locale
 
-private val TerminalBackground = Color(0xFF07110F)
-private val TerminalPanel = Color(0xFF0D1B17)
-private val TerminalPanelAlt = Color(0xFF10231D)
-private val TerminalBorder = Color(0xFF1D4034)
-private val TerminalGreen = Color(0xFF35D69A)
-private val TerminalMuted = Color(0xFF8AA69A)
-private val TerminalText = Color(0xFFE4F2EB)
-private val TerminalRed = Color(0xFFFF7777)
-private val TerminalAmber = Color(0xFFFFC66D)
 
 @Composable
 fun MarketScannerScreen(
@@ -68,15 +61,15 @@ fun MarketScannerScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(TerminalBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(TerminalPanel, RoundedCornerShape(16.dp))
-                .border(1.dp, TerminalBorder, RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -84,14 +77,14 @@ fun MarketScannerScreen(
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     text = "NOBITEX TERMINAL",
-                    color = TerminalGreen,
-                    fontSize = 17.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.2.sp
                 )
                 Text(
                     text = "موتور پایش بازار",
-                    color = TerminalMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
@@ -102,7 +95,7 @@ fun MarketScannerScreen(
                 ) {
                     Text(
                         text = if (state.isScanning) "SCANNING" else "STANDBY",
-                        color = if (state.isScanning) TerminalGreen else TerminalMuted,
+                        color = if (state.isScanning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -110,15 +103,15 @@ fun MarketScannerScreen(
                         modifier = Modifier
                             .size(8.dp)
                             .background(
-                                if (state.isScanning) TerminalGreen else TerminalMuted,
+                                if (state.isScanning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 RoundedCornerShape(50)
                             )
                     )
                 }
                 Text(
                     text = "REST SNAPSHOT",
-                    color = TerminalMuted,
-                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
                     letterSpacing = 0.8.sp
                 )
             }
@@ -133,10 +126,10 @@ fun MarketScannerScreen(
                 enabled = !state.isScanning,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = TerminalGreen,
-                    contentColor = Color(0xFF062017),
-                    disabledContainerColor = TerminalBorder,
-                    disabledContentColor = TerminalMuted
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    disabledContainerColor = MaterialTheme.colorScheme.outline,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -149,8 +142,8 @@ fun MarketScannerScreen(
                 onClick = { viewModel.clearResults() },
                 enabled = !state.isScanning && state.results.isNotEmpty(),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = TerminalMuted,
-                    disabledContentColor = TerminalBorder
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledContentColor = MaterialTheme.colorScheme.outline
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -166,19 +159,19 @@ fun MarketScannerScreen(
                 title = "دریافت‌شده",
                 value = state.totalCount.toString(),
                 modifier = Modifier.weight(1f),
-                valueColor = TerminalText
+                valueColor = MaterialTheme.colorScheme.onSurface
             )
             MetricPanel(
                 title = "موفق",
                 value = successfulCount.toString(),
                 modifier = Modifier.weight(1f),
-                valueColor = TerminalGreen
+                valueColor = MaterialTheme.colorScheme.primary
             )
             MetricPanel(
                 title = "ناموفق",
                 value = failedCount.toString(),
                 modifier = Modifier.weight(1f),
-                valueColor = if (failedCount > 0) TerminalRed else TerminalMuted
+                valueColor = if (failedCount > 0) AfaColorSchemes.loss else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -196,13 +189,13 @@ fun MarketScannerScreen(
                 title = "نقدینگی خرید ۵ سطح",
                 value = formatQuoteLiquidity(bidLiquidity),
                 modifier = Modifier.weight(1f),
-                valueColor = TerminalGreen
+                valueColor = MaterialTheme.colorScheme.primary
             )
             MetricPanel(
                 title = "نقدینگی فروش ۵ سطح",
                 value = formatQuoteLiquidity(askLiquidity),
                 modifier = Modifier.weight(1f),
-                valueColor = TerminalRed
+                valueColor = AfaColorSchemes.loss
             )
         }
         Row(
@@ -214,7 +207,7 @@ fun MarketScannerScreen(
                 value = formatQuoteLiquidity(kotlin.math.abs(liquidityDifference)) +
                     if (liquidityDifference >= 0.0) " +" else " -",
                 modifier = Modifier.weight(1f),
-                valueColor = if (liquidityDifference >= 0.0) TerminalGreen else TerminalRed
+                valueColor = if (liquidityDifference >= 0.0) MaterialTheme.colorScheme.primary else AfaColorSchemes.loss
             )
             MetricPanel(
                 title = "میانگین اختلاف قیمت",
@@ -222,21 +215,21 @@ fun MarketScannerScreen(
                     String.format(Locale.US, "%.3f%%", it)
                 } ?: "—",
                 modifier = Modifier.weight(1f),
-                valueColor = TerminalAmber
+                valueColor = AfaColorSchemes.warning
             )
         }
         Text(
             "این ارقام نقدینگی ۵ ردیف اول دفتر سفارش بازارهای موفقِ قابل‌نمایش هستند؛ " +
                 "نه تعداد معاملات انجام‌شده، نه ورود/خروج قطعی سرمایه و نه سود حساب.",
-            color = TerminalMuted,
-            fontSize = 10.sp
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp
         )
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = TerminalPanel),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(14.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, TerminalBorder)
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
         ) {
             Column(
                 modifier = Modifier.padding(12.dp),
@@ -249,19 +242,19 @@ fun MarketScannerScreen(
                 ) {
                     Text(
                         "به‌روزرسانی خودکار",
-                        color = TerminalText,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         if (state.autoRefreshEnabled) "فعال" else "خاموش",
-                        color = if (state.autoRefreshEnabled) TerminalGreen else TerminalMuted,
+                        color = if (state.autoRefreshEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Text(
                     "فاصله اسکن: ${state.refreshIntervalMs / 1000} ثانیه",
-                    color = TerminalMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
                 Row(
@@ -294,7 +287,7 @@ fun MarketScannerScreen(
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(
                 "مرتب‌سازی و فیلتر",
-                color = TerminalGreen,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleSmall
             )
@@ -367,13 +360,13 @@ fun MarketScannerScreen(
         ) {
             Text(
                 "خروجی اسکن",
-                color = TerminalGreen,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
                 "${visibleResults.size} نمایش  •  $filteredOutCount فیلترشده",
-                color = TerminalMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp
             )
         }
@@ -381,10 +374,10 @@ fun MarketScannerScreen(
         state.errorMessage?.let { message ->
             Text(
                 text = "خطا: $message",
-                color = TerminalRed,
+                color = AfaColorSchemes.loss,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF2A1518), RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(10.dp))
                     .padding(10.dp)
             )
         }
@@ -393,25 +386,25 @@ fun MarketScannerScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TerminalPanelAlt, RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
                     .padding(9.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(18.dp),
-                    color = TerminalGreen,
+                    color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 2.dp
                 )
                 Text(
                     "دریافت و پردازش پاسخ بازار...",
-                    color = TerminalMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall
                 )
                 OutlinedButton(
                     onClick = { viewModel.cancelScan() },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TerminalRed),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AfaColorSchemes.loss),
                     shape = RoundedCornerShape(9.dp)
                 ) {
                     Text("توقف")
@@ -467,18 +460,24 @@ private fun MetricPanel(
 ) {
     Column(
         modifier = modifier
-            .background(TerminalPanel, RoundedCornerShape(12.dp))
-            .border(1.dp, TerminalBorder, RoundedCornerShape(12.dp))
-            .padding(vertical = 10.dp, horizontal = 8.dp),
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .padding(vertical = 12.dp, horizontal = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        Text(title, color = TerminalMuted, fontSize = 10.sp)
+        Text(
+            title,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 2
+        )
         Text(
             value,
             color = valueColor,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
         )
     }
 }
@@ -492,7 +491,7 @@ private fun TerminalChoiceButton(
     OutlinedButton(
         onClick = onClick,
         modifier = modifier,
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = TerminalGreen),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
         shape = RoundedCornerShape(9.dp)
     ) {
         Text(text, fontSize = 11.sp)
@@ -510,7 +509,7 @@ private fun TerminalActionButton(
         OutlinedButton(
             onClick = onClick,
             modifier = modifier,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = TerminalGreen),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
             shape = RoundedCornerShape(10.dp)
         ) {
             Text(text)
@@ -520,8 +519,8 @@ private fun TerminalActionButton(
             onClick = onClick,
             modifier = modifier,
             colors = ButtonDefaults.buttonColors(
-                containerColor = TerminalGreen,
-                contentColor = Color(0xFF062017)
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ),
             shape = RoundedCornerShape(10.dp)
         ) {
@@ -542,8 +541,8 @@ private fun SortButton(
             onClick = onClick,
             modifier = modifier,
             colors = ButtonDefaults.buttonColors(
-                containerColor = TerminalGreen,
-                contentColor = Color(0xFF062017)
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ),
             shape = RoundedCornerShape(9.dp)
         ) {
@@ -553,7 +552,7 @@ private fun SortButton(
         OutlinedButton(
             onClick = onClick,
             modifier = modifier,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = TerminalMuted),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
             shape = RoundedCornerShape(9.dp)
         ) {
             Text(text, fontSize = 11.sp)
@@ -578,11 +577,11 @@ private fun MarketResultCard(
             .fillMaxWidth()
             .border(
                 width = 1.dp,
-                color = if (result.success) TerminalBorder else Color(0xFF63343A),
+                color = if (result.success) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error,
                 shape = RoundedCornerShape(13.dp)
             ),
         colors = CardDefaults.cardColors(
-            containerColor = if (result.success) TerminalPanel else Color(0xFF241518)
+            containerColor = if (result.success) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.errorContainer
         ),
         shape = RoundedCornerShape(13.dp)
     ) {
@@ -599,7 +598,7 @@ private fun MarketResultCard(
             ) {
                 Text(
                     result.symbol,
-                    color = TerminalText,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp
                 )
@@ -610,15 +609,15 @@ private fun MarketResultCard(
                     if (rank != null) {
                         Text(
                             "اولویت #$rank",
-                            color = TerminalGreen,
-                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Text(
                         if (result.success) "داده دریافت شد" else "خطا در دریافت",
-                        color = if (result.success) TerminalGreen else TerminalRed,
-                        fontSize = 10.sp,
+                        color = if (result.success) MaterialTheme.colorScheme.primary else AfaColorSchemes.loss,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -641,15 +640,15 @@ private fun MarketResultCard(
                 }
                 Text(
                     rankingBasis,
-                    color = TerminalMuted,
-                    fontSize = 10.sp
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
                 )
             }
 
             if (!result.success) {
                 Text(
                     result.error ?: "داده معتبر نیست",
-                    color = TerminalRed,
+                    color = AfaColorSchemes.loss,
                     style = MaterialTheme.typography.bodySmall
                 )
             } else {
@@ -687,7 +686,7 @@ private fun MarketResultCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(TerminalPanelAlt, RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(9.dp))
                         .padding(horizontal = 9.dp, vertical = 7.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -704,8 +703,8 @@ private fun MarketResultCard(
                 }
                 Text(
                     "سهم عمق خرید از مجموع ۱۰ سطح برتر دفتر سفارش؛ شاخص فشار سفارش است، نه پیش‌بینی قطعی قیمت.",
-                    color = TerminalMuted,
-                    fontSize = 9.sp
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
                 )
 
                 OutlinedButton(
@@ -713,25 +712,25 @@ private fun MarketResultCard(
                     enabled = !tradeLoading,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = TerminalAmber,
-                        disabledContentColor = TerminalMuted
+                        contentColor = AfaColorSchemes.warning,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     shape = RoundedCornerShape(9.dp)
                 ) {
                     Text(if (tradeLoading) "دریافت معاملات عمومی..." else "بررسی معاملات انجام‌شده")
                 }
                 tradeError?.let {
-                    Text("خطای معاملات: $it", color = TerminalRed, fontSize = 10.sp)
+                    Text("خطای معاملات: $it", color = AfaColorSchemes.loss, fontSize = 11.sp)
                 }
                 tradeFlow?.let { flow ->
                     Column(
                         modifier = Modifier.fillMaxWidth()
-                            .background(TerminalPanelAlt, RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
                             .padding(10.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text("جریان معاملات عمومی اخیر • ${flow.buyCount + flow.sellCount} معامله",
-                            color = TerminalAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            color = AfaColorSchemes.warning, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             DataValue("تعداد خرید", flow.buyCount.toString())
                             DataValue("تعداد فروش", flow.sellCount.toString())
@@ -743,13 +742,20 @@ private fun MarketResultCard(
                         DataValue("خالص خرید منهای فروش",
                             (if (flow.netQuoteFlow >= 0.0) "+" else "") + formatQuoteLiquidity(flow.netQuoteFlow))
                         Text(
-                            flow.latestTradeTimeMillis?.let { "آخرین معامله: " +
+                            flow.latestTradeTimeMillis?.let { "زمان آخرین معامله: " +
                                 java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(java.util.Date(it)) }
                                 ?: "معامله‌ای در پاسخ اخیر موجود نبود",
-                            color = TerminalMuted, fontSize = 10.sp
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp
+                        )
+                        Text(
+                            "زمان دریافت داده: " +
+                                java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                                    .format(java.util.Date(flow.fetchedAtMillis)) +
+                                " • برای تازه‌سازی دوباره دکمه دریافت را بزنید",
+                            color = AfaColorSchemes.warning, fontSize = 11.sp
                         )
                         Text("نمونه معاملات اخیر API عمومی؛ نه کل معاملات روز و نه سود حساب شخصی.",
-                            color = TerminalMuted, fontSize = 9.sp)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                     }
                 }
 
@@ -758,8 +764,8 @@ private fun MarketResultCard(
                     enabled = analysisState?.isLoading != true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = TerminalGreen,
-                        disabledContentColor = TerminalMuted
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     shape = RoundedCornerShape(9.dp)
                 ) {
@@ -788,14 +794,14 @@ private fun StrategyAnalysisPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(TerminalPanelAlt, RoundedCornerShape(10.dp))
-            .border(1.dp, TerminalBorder, RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
             "تحلیل کندلی مستقل • بازه ۴۸ ساعت",
-            color = TerminalGreen,
+            color = MaterialTheme.colorScheme.primary,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold
         )
@@ -807,34 +813,61 @@ private fun StrategyAnalysisPanel(
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
-                    color = TerminalGreen,
+                    color = MaterialTheme.colorScheme.primary,
                     strokeWidth = 2.dp
                 )
-                Text("دریافت کندل و ارزیابی استراتژی‌ها...", color = TerminalMuted, fontSize = 11.sp)
+                Text("دریافت کندل و ارزیابی استراتژی‌ها...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
             }
         }
 
         state.error?.let {
-            Text("خطای تحلیل: $it", color = TerminalRed, fontSize = 11.sp)
+            Text("خطای تحلیل: $it", color = AfaColorSchemes.loss, fontSize = 11.sp)
         }
 
         state.result?.let { analysis ->
             Text(
                 "تعداد کندل دریافتی: ${analysis.candles.size}",
-                color = TerminalMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp
             )
+
+            analysis.batch?.let { batch ->
+                Text(
+                    "گزارش اجرای استراتژی‌ها: ${batch.attemptedStrategyCount}/${batch.expectedStrategyCount} اجرا • ${batch.failures.size} خطا",
+                    color = if (batch.failures.isEmpty()) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        AfaColorSchemes.warning
+                    },
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                batch.failures.forEach { failure ->
+                    Text(
+                        "خطای ${failure.strategyId.name}: ${failure.message}",
+                        color = AfaColorSchemes.loss,
+                        fontSize = 10.sp
+                    )
+                }
+                if (!batch.isComplete && batch.failures.isEmpty()) {
+                    Text(
+                        "اجرای همهٔ استراتژی‌های ثبت‌شده کامل نشده است.",
+                        color = AfaColorSchemes.warning,
+                        fontSize = 10.sp
+                    )
+                }
+            }
 
             if (!analysis.isFetchSuccessful) {
                 Text(
                     "دریافت داده ناموفق: ${analysis.fetchError}",
-                    color = TerminalRed,
+                    color = AfaColorSchemes.loss,
                     fontSize = 11.sp
                 )
             } else {
                 val decision = analysis.decision
                 if (decision == null) {
-                    Text("NO TRADE • تصمیمی در دسترس نیست", color = TerminalAmber, fontWeight = FontWeight.Bold)
+                    Text("NO TRADE • تصمیمی در دسترس نیست", color = AfaColorSchemes.warning, fontWeight = FontWeight.Bold)
                 } else {
                     val directionLabel = when {
                         decision.isActionable && decision.direction.name == "LONG" -> "LONG"
@@ -845,25 +878,25 @@ private fun StrategyAnalysisPanel(
                     }
                     Text(
                         directionLabel,
-                        color = if (decision.isActionable) TerminalGreen else TerminalAmber,
+                        color = if (decision.isActionable) MaterialTheme.colorScheme.primary else AfaColorSchemes.warning,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         "توافق استراتژی‌ها: ${decision.agreeingStrategyIds.size}",
-                        color = TerminalText,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 11.sp
                     )
                     if (decision.isActionable) {
                         Text(
                             "میانگین اطمینان: ${String.format(Locale.US, "%.1f", decision.confidence * 100.0)}٪",
-                            color = TerminalGreen,
+                            color = MaterialTheme.colorScheme.primary,
                             fontSize = 11.sp
                         )
                     }
                     Text(
                         decision.reason,
-                        color = TerminalMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                 }
@@ -872,8 +905,8 @@ private fun StrategyAnalysisPanel(
 
         Text(
             "فقط تحلیل و سیگنال؛ هیچ سفارش یا معامله‌ای ثبت نمی‌شود.",
-            color = TerminalAmber,
-            fontSize = 10.sp
+            color = AfaColorSchemes.warning,
+            fontSize = 11.sp
         )
     }
 }
@@ -887,10 +920,10 @@ private fun DataValue(
         modifier = Modifier.padding(vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Text(label, color = TerminalMuted, fontSize = 10.sp)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         Text(
             value,
-            color = TerminalText,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium
         )

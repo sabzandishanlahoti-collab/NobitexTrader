@@ -25,18 +25,62 @@ data class PublicTradeFlowSummary(
     val buyQuoteVolume: Double,
     val sellQuoteVolume: Double,
     val netQuoteFlow: Double,
-    val latestTradeTimeMillis: Long?
+    val latestTradeTimeMillis: Long?,
+    val fetchedAtMillis: Long
 ) {
     companion object {
-        fun from(trades: List<PublicTrade>): PublicTradeFlowSummary = PublicTradeFlowSummary(
-            buyCount = trades.count { it.type == TradeSide.BUY },
-            sellCount = trades.count { it.type == TradeSide.SELL },
-            buyQuoteVolume = trades.filter { it.type == TradeSide.BUY }.sumOf { it.quoteVolume },
-            sellQuoteVolume = trades.filter { it.type == TradeSide.SELL }.sumOf { it.quoteVolume },
-            netQuoteFlow = trades.filter { it.type == TradeSide.BUY }.sumOf { it.quoteVolume } -
-                trades.filter { it.type == TradeSide.SELL }.sumOf { it.quoteVolume },
-            latestTradeTimeMillis = trades.maxOfOrNull { it.timeMillis }
-        )
+        fun from(
+            trades: List<PublicTrade>,
+            fetchedAtMillis: Long = System.currentTimeMillis()
+        ): PublicTradeFlowSummary {
+            require(fetchedAtMillis > 0L) {
+                "Fetch timestamp must be positive"
+            }
+            trades.forEachIndexed { index, trade ->
+                require(trade.timeMillis > 0L) {
+                    "Public trade timestamp must be positive at index $index"
+                }
+                require(trade.price.isFinite() && trade.price > 0.0) {
+                    "Public trade price must be finite and positive at index $index"
+                }
+                require(trade.volume.isFinite() && trade.volume >= 0.0) {
+                    "Public trade volume must be finite and non-negative at index $index"
+                }
+                require(trade.quoteVolume.isFinite() && trade.quoteVolume >= 0.0) {
+                    "Public trade quote volume must be finite and non-negative at index $index"
+                }
+            }
+
+            val buys = trades.filter { it.type == TradeSide.BUY }
+            val sells = trades.filter { it.type == TradeSide.SELL }
+            val buyVolume = sumFiniteQuoteVolume(buys)
+            val sellVolume = sumFiniteQuoteVolume(sells)
+            val netFlow = buyVolume - sellVolume
+
+            require(netFlow.isFinite()) {
+                "Public trade net quote flow is non-finite"
+            }
+
+            return PublicTradeFlowSummary(
+                buyCount = buys.size,
+                sellCount = sells.size,
+                buyQuoteVolume = buyVolume,
+                sellQuoteVolume = sellVolume,
+                netQuoteFlow = netFlow,
+                latestTradeTimeMillis = trades.maxOfOrNull { it.timeMillis },
+                fetchedAtMillis = fetchedAtMillis
+            )
+        }
+
+        private fun sumFiniteQuoteVolume(trades: List<PublicTrade>): Double {
+            return trades.fold(0.0) { total, trade ->
+                val next = total + trade.quoteVolume
+                require(next.isFinite()) {
+                    "Public trade quote volume total is non-finite"
+                }
+                next
+            }
+        }
     }
 }
 
@@ -365,6 +409,9 @@ class MarketScannerViewModel(
                 _uiState.value = _uiState.value.copy(
                     tradeFlowBySymbol = _uiState.value.tradeFlowBySymbol + (normalizedSymbol to summary)
                 )
+                // The combined buy-flow ranking depends on this newly loaded data.
+                // Re-sort immediately so the visible list does not remain stale.
+                refreshDisplayedResults()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

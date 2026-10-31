@@ -59,7 +59,7 @@ class BacktestEngineTest {
     }
 
     @Test
-    fun gapThroughStopUsesWorseOpeningPrice() {
+    fun longGapThroughStopSkipsStaleEntrySignal() {
         val candles = listOf(
             c(1, 100.0, 101.0, 99.0, 100.0),
             c(2, 90.0, 96.0, 89.0, 92.0)
@@ -69,8 +69,24 @@ class BacktestEngineTest {
             feeRate = 0.0, slippageRate = 0.0
         )) { if (it.size == 1) BacktestSignal(TradeDirection.LONG, 95.0, 120.0) else null }
 
-        assertEquals(90.0, result.trades.single().exitPrice, 0.000001)
-        assertEquals(ExitReason.STOP_LOSS, result.trades.single().exitReason)
+        assertEquals(0, result.totalTrades)
+        assertTrue(result.trades.isEmpty())
+        assertEquals(10_000.0, result.finalEquity, 0.000001)
+    }
+
+    @Test
+    fun longGapBeyondTargetSkipsMissedEntry() {
+        val candles = listOf(
+            c(1, 100.0, 101.0, 99.0, 100.0),
+            c(2, 110.0, 112.0, 109.0, 111.0)
+        )
+        val result = BacktestEngine().run(candles, BacktestConfig(
+            initialCapital = 10_000.0, positionNotional = 1_000.0,
+            feeRate = 0.0, slippageRate = 0.0
+        )) { if (it.size == 1) BacktestSignal(TradeDirection.LONG, 95.0, 105.0) else null }
+
+        assertEquals(0, result.totalTrades)
+        assertEquals(10_000.0, result.finalEquity, 0.000001)
     }
 
     @Test
@@ -152,6 +168,55 @@ class BacktestEngineTest {
         assertEquals(92.0, result.trades.single().exitPrice, 0.000001)
         assertEquals(ExitReason.TAKE_PROFIT, result.trades.single().exitReason)
         assertTrue(result.trades.single().netPnl > 0.0)
+    }
+
+    @Test
+    fun shortGapThroughStopSkipsStaleEntrySignal() {
+        val candles = listOf(
+            c(1, 100.0, 101.0, 99.0, 100.0),
+            c(2, 110.0, 112.0, 109.0, 111.0)
+        )
+        val result = BacktestEngine().run(candles, BacktestConfig(
+            initialCapital = 10_000.0, positionNotional = 1_000.0,
+            feeRate = 0.0, slippageRate = 0.0
+        )) { history ->
+            if (history.size == 1) BacktestSignal(TradeDirection.SHORT, 105.0, 80.0) else null
+        }
+
+        assertEquals(0, result.totalTrades)
+        assertEquals(10_000.0, result.finalEquity, 0.000001)
+    }
+
+    @Test
+    fun shortGapBeyondTargetSkipsMissedEntry() {
+        val candles = listOf(
+            c(1, 100.0, 101.0, 99.0, 100.0),
+            c(2, 90.0, 91.0, 88.0, 89.0),
+            c(3, 89.0, 90.0, 88.0, 89.0)
+        )
+        val result = BacktestEngine().run(candles, BacktestConfig(
+            initialCapital = 10_000.0, positionNotional = 1_000.0,
+            feeRate = 0.0, slippageRate = 0.0
+        )) { history ->
+            if (history.size == 1) BacktestSignal(TradeDirection.SHORT, 105.0, 95.0) else null
+        }
+
+        assertEquals(0, result.totalTrades)
+        assertEquals(10_000.0, result.finalEquity, 0.000001)
+    }
+
+    @Test
+    fun entrySlippageCannotPushLongEntryThroughTarget() {
+        val candles = listOf(
+            c(1, 100.0, 101.0, 99.0, 100.0),
+            c(2, 104.9, 105.0, 104.0, 104.8)
+        )
+        val result = BacktestEngine().run(candles, BacktestConfig(
+            initialCapital = 10_000.0, positionNotional = 1_000.0,
+            feeRate = 0.0, slippageRate = 0.002
+        )) { if (it.size == 1) BacktestSignal(TradeDirection.LONG, 95.0, 105.0) else null }
+
+        assertEquals(0, result.totalTrades)
     }
 
     @Test
