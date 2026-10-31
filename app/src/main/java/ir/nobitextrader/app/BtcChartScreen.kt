@@ -182,12 +182,5 @@ private fun CandlestickPlot(candles: List<Candle>, modifier: Modifier = Modifier
                 size = Size(bodyWidth, bodyHeight)
             )
         }
-        drawLine(
-            color = MaterialTheme.colorScheme.outlineVariant,
-            start = Offset(0f, top),
-            end = Offset(size.width, top),
-            strokeWidth = 1f,
-            pathEffect = null
-        )
     }
 }
