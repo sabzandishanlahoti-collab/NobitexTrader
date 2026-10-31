@@ -36,6 +36,16 @@ object MarketRanking {
                     }
                 )
 
+            MarketSortMode.BUY_PRESSURE_HIGH_TO_LOW ->
+                successful.sortedWith(
+                    compareByDescending<MarketScanResult> { result ->
+                        val bid = safeNonNegative(result.bidLiquidityTop5)
+                        val ask = safeNonNegative(result.askLiquidityTop5)
+                        val total = bid + ask
+                        if (total.isFinite() && total > 0.0) bid / total else -1.0
+                    }
+                )
+
             MarketSortMode.BALANCED_PRIORITY ->
                 rankBalanced(successful)
         }
