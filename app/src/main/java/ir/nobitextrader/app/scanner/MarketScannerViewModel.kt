@@ -3,6 +3,9 @@ package ir.nobitextrader.app.scanner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import ir.nobitextrader.app.TraderSettings
+import ir.nobitextrader.app.data.NobitexTradesApi
+import ir.nobitextrader.app.data.PublicTrade
+import ir.nobitextrader.app.data.TradeSide
 import ir.nobitextrader.app.strategy.StrategyAnalysisCoordinator
 import ir.nobitextrader.app.strategy.StrategyAnalysisResult
 import kotlinx.coroutines.CancellationException
@@ -15,6 +18,27 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
+
+data class PublicTradeFlowSummary(
+    val buyCount: Int,
+    val sellCount: Int,
+    val buyQuoteVolume: Double,
+    val sellQuoteVolume: Double,
+    val netQuoteFlow: Double,
+    val latestTradeTimeMillis: Long?
+) {
+    companion object {
+        fun from(trades: List<PublicTrade>): PublicTradeFlowSummary = PublicTradeFlowSummary(
+            buyCount = trades.count { it.type == TradeSide.BUY },
+            sellCount = trades.count { it.type == TradeSide.SELL },
+            buyQuoteVolume = trades.filter { it.type == TradeSide.BUY }.sumOf { it.quoteVolume },
+            sellQuoteVolume = trades.filter { it.type == TradeSide.SELL }.sumOf { it.quoteVolume },
+            netQuoteFlow = trades.filter { it.type == TradeSide.BUY }.sumOf { it.quoteVolume } -
+                trades.filter { it.type == TradeSide.SELL }.sumOf { it.quoteVolume },
+            latestTradeTimeMillis = trades.maxOfOrNull { it.timeMillis }
+        )
+    }
+}
 
 data class StrategyAnalysisUiState(
     val isLoading: Boolean = false,
@@ -34,7 +58,10 @@ data class MarketScannerUiState(
     val filterMode: MarketResultFilterMode = MarketResultFilterMode.ALL,
     val autoRefreshEnabled: Boolean = false,
     val refreshIntervalMs: Long = MarketRefreshPolicy.DEFAULT_INTERVAL_MS,
-    val analysisBySymbol: Map<String, StrategyAnalysisUiState> = emptyMap()
+    val analysisBySymbol: Map<String, StrategyAnalysisUiState> = emptyMap(),
+    val tradeFlowBySymbol: Map<String, PublicTradeFlowSummary> = emptyMap(),
+    val tradeLoadingSymbols: Set<String> = emptySet(),
+    val tradeErrorBySymbol: Map<String, String> = emptyMap()
 )
 
 class MarketScannerViewModel(
@@ -48,6 +75,7 @@ class MarketScannerViewModel(
     private var scanJob: Job? = null
     private var autoRefreshJob: Job? = null
     private val analysisJobs = mutableMapOf<String, Job>()
+    private val tradeJobs = mutableMapOf<String, Job>()
     private var scanGeneration = 0L
     private var allResults: List<MarketScanResult> = emptyList()
 
@@ -320,6 +348,39 @@ class MarketScannerViewModel(
         )
     }
 
+    fun loadRecentTradeFlow(symbol: String, forceRefresh: Boolean = false) {
+        val normalizedSymbol = symbol.trim().uppercase(java.util.Locale.ROOT)
+        if (normalizedSymbol.isBlank()) return
+        if (tradeJobs[normalizedSymbol]?.isActive == true) return
+        if (!forceRefresh && _uiState.value.tradeFlowBySymbol.containsKey(normalizedSymbol)) return
+
+        tradeJobs[normalizedSymbol] = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                tradeLoadingSymbols = _uiState.value.tradeLoadingSymbols + normalizedSymbol,
+                tradeErrorBySymbol = _uiState.value.tradeErrorBySymbol - normalizedSymbol
+            )
+            try {
+                val trades = NobitexTradesApi.fetchRecentTrades(normalizedSymbol)
+                val summary = PublicTradeFlowSummary.from(trades)
+                _uiState.value = _uiState.value.copy(
+                    tradeFlowBySymbol = _uiState.value.tradeFlowBySymbol + (normalizedSymbol to summary)
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    tradeErrorBySymbol = _uiState.value.tradeErrorBySymbol +
+                        (normalizedSymbol to (e.message ?: "دریافت معاملات ناموفق بود"))
+                )
+            } finally {
+                _uiState.value = _uiState.value.copy(
+                    tradeLoadingSymbols = _uiState.value.tradeLoadingSymbols - normalizedSymbol
+                )
+                tradeJobs.remove(normalizedSymbol)
+            }
+        }
+    }
+
     fun analyzeMarket(symbol: String) {
         val normalizedSymbol = symbol.trim().uppercase(java.util.Locale.ROOT)
         if (normalizedSymbol.isBlank()) return
@@ -398,6 +459,8 @@ class MarketScannerViewModel(
         scanJob?.cancel()
         analysisJobs.values.forEach { it.cancel() }
         analysisJobs.clear()
+        tradeJobs.values.forEach { it.cancel() }
+        tradeJobs.clear()
         super.onCleared()
     }
 }
