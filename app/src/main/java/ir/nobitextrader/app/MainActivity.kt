@@ -130,11 +130,44 @@ private fun DashboardScreen(
     marketUpdatedAt: Long?,
     marketConnected: Boolean,
     scannerState: MarketScannerUiState,
+    paperPortfolio: PaperPortfolio,
     onOpenSettings: () -> Unit,
     onOpenScanner: () -> Unit,
     onScanMarkets: () -> Unit,
+    onStartEngine: () -> Unit,
+    onStopEngine: () -> Unit,
+    onKillEngine: () -> Unit,
     onRefreshMarket: () -> Unit
 ) {
+    val paperPositions = paperPortfolio.positions.filter { it.quantity > 0.0 }
+    val paperInvestedCost = paperPositions.sumOf { it.quantity * it.averageEntry }
+    val paperPositionMarks = paperPositions.map { position ->
+        val scannedPrice = scannerState.rawResults.firstOrNull {
+            it.symbol == position.symbol && it.success
+        }?.lastPrice
+        val currentPrice = if (position.symbol == "BTCIRT") {
+            marketResult?.latest?.takeIf { it.isFinite() && it > 0.0 } ?: scannedPrice
+        } else {
+            scannedPrice
+        }
+        position to currentPrice?.takeIf { it.isFinite() && it > 0.0 }
+    }
+    val allPaperPositionsMarked = paperPositionMarks.all { it.second != null }
+    val paperUnrealizedPnl = if (allPaperPositionsMarked) {
+        paperPositionMarks.sumOf { (position, price) ->
+            (price!! - position.averageEntry) * position.quantity
+        }
+    } else null
+    val paperTotalPnl = paperUnrealizedPnl?.plus(paperPortfolio.realizedPnl)
+    val paperPositionValue = if (allPaperPositionsMarked) {
+        paperPositionMarks.sumOf { (position, price) -> position.quantity * price!! }
+    } else paperInvestedCost
+    val paperPositionColor = when {
+        paperUnrealizedPnl == null -> MaterialTheme.colorScheme.onSurfaceVariant
+        paperUnrealizedPnl >= 0.0 -> AfaColorSchemes.profit
+        else -> AfaColorSchemes.loss
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -185,36 +218,42 @@ private fun DashboardScreen(
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                if (english) "ACCOUNT OVERVIEW" else "نمای کلی سرمایه",
+                if (english) "PAPER ACCOUNT OVERVIEW" else "نمای کلی سرمایه مجازی",
                 color = MaterialTheme.colorScheme.primary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
             androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MetricCard(
-                    title = if (english) "INITIAL CAPITAL" else "سرمایه اولیه",
-                    value = "—",
-                    accent = MaterialTheme.colorScheme.primary,
+                    title = if (english) "AVAILABLE CASH" else "سرمایه آزاد مجازی",
+                    value = String.format(Locale.US, "%,.0f IRR", paperPortfolio.cash),
+                    accent = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
                     title = if (english) "IN POSITIONS" else "سرمایه در گردش",
-                    value = "—",
-                    accent = MaterialTheme.colorScheme.primary,
+                    value = String.format(Locale.US, "%,.0f IRR", paperPositionValue),
+                    accent = paperPositionColor,
                     modifier = Modifier.weight(1f)
                 )
             }
             androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 MetricCard(
                     title = if (english) "NET PROFIT" else "سود خالص",
-                    value = "—",
-                    accent = AfaColorSchemes.profit,
+                    value = paperTotalPnl?.let {
+                        String.format(Locale.US, "%,.0f IRR", it.coerceAtLeast(0.0))
+                    } ?: "—",
+                    accent = if ((paperTotalPnl ?: 0.0) > 0.0) AfaColorSchemes.profit
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
                     title = if (english) "NET LOSS" else "ضرر خالص",
-                    value = "—",
-                    accent = AfaColorSchemes.loss,
+                    value = paperTotalPnl?.let {
+                        String.format(Locale.US, "%,.0f IRR", (-it).coerceAtLeast(0.0))
+                    } ?: "—",
+                    accent = if ((paperTotalPnl ?: 0.0) < 0.0) AfaColorSchemes.loss
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -251,75 +290,74 @@ private fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    if (english) "ENGINE CONTROL" else "کنترل موتور معاملاتی",
+                    if (english) "SCANNER ENGINE CONTROL" else "کنترل موتور اسکن",
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Surface(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        color = if (scannerState.autoRefreshEnabled || scannerState.isScanning)
+                            Color(0xFFE0F4E8) else MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(50)
                     ) {
                         Text(
-                            if (english) "NOT CONNECTED" else "اتصال اجرا برقرار نیست",
+                            if (scannerState.autoRefreshEnabled || scannerState.isScanning) {
+                                if (english) "SCANNER RUNNING" else "اسکنر فعال"
+                            } else {
+                                if (english) "SCANNER STOPPED" else "اسکنر متوقف"
+                            },
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            color = if (scannerState.autoRefreshEnabled || scannerState.isScanning)
+                                Color(0xFF168A45) else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (english) "Order execution is not enabled" else "ثبت سفارش هنوز فعال نشده است",
+                        if (english) "PUBLIC MARKET DATA • PAPER MODE ONLY"
+                        else "فقط کنترل اسکن داده عمومی • بدون سفارش واقعی",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp
+                        fontSize = 10.sp
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     Button(
-                        onClick = {},
-                        enabled = false,
+                        onClick = onStartEngine,
                         modifier = Modifier.weight(1f),
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF168A45),
-                            contentColor = Color.White,
-                            disabledContainerColor = Color(0xFF168A45),
-                            disabledContentColor = Color.White
+                            contentColor = Color.White
                         )
                     ) {
                         Text("START", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     Button(
-                        onClick = {},
-                        enabled = false,
+                        onClick = onStopEngine,
                         modifier = Modifier.weight(1f),
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFFFDADA),
-                            contentColor = Color(0xFF9E4141),
-                            disabledContainerColor = Color(0xFFFFDADA),
-                            disabledContentColor = Color(0xFF9E4141)
+                            contentColor = Color(0xFF9E4141)
                         )
                     ) {
                         Text("STOP", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     Button(
-                        onClick = {},
-                        enabled = false,
+                        onClick = onKillEngine,
                         modifier = Modifier.weight(1f),
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFB71C1C),
-                            contentColor = Color.White,
-                            disabledContainerColor = Color(0xFFB71C1C),
-                            disabledContentColor = Color.White
+                            contentColor = Color.White
                         )
                     ) {
                         Text("KILL", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                     }
                 }
                 Text(
-                    if (english) "Controls unlock only after verified private API, order state and emergency-close tests." else "این کلیدها پس از تکمیل و آزمایش API خصوصی، وضعیت سفارش‌ها و توقف اضطراری فعال می‌شوند.",
+                    if (english) "START runs the scanner and auto-refresh. STOP pauses scanning. KILL cancels scanner, analysis and public-trade jobs. These controls do not send or cancel real exchange orders."
+                    else "START اسکن و تازه‌سازی خودکار را آغاز می‌کند. STOP اسکن را متوقف می‌کند. KILL اسکن، تحلیل و دریافت معاملات عمومی را لغو می‌کند. این کلیدها سفارش واقعی صرافی را ثبت یا لغو نمی‌کنند.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
+                    fontSize = 10.sp
                 )
             }
         }
@@ -421,11 +459,12 @@ private fun DashboardScreen(
                         Text(if (english) "LAST PRICE (IRR)" else "آخرین قیمت (ریال)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
                         Text(if (english) "SPREAD" else "اختلاف", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
                     }
-                    scannerState.results
+                    val dashboardMarkets = scannerState.rawResults
                         .asSequence()
                         .filter { it.success && it.lastPrice.isFinite() && it.lastPrice > 0.0 }
-                        .take(10)
-                        .forEach { result ->
+                        .take(20)
+                        .toList()
+                    dashboardMarkets.forEach { result ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -441,7 +480,7 @@ private fun DashboardScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    String.format(Locale.US, "%,.0f", result.lastPrice),
+                                    String.format(Locale.US, "%,.0f IRR", result.lastPrice),
                                     color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -453,6 +492,14 @@ private fun DashboardScreen(
                                 )
                             }
                         }
+                    if (dashboardMarkets.isEmpty() && scannerState.successfulCount > 0) {
+                        Text(
+                            if (english) "API reported ${scannerState.successfulCount} valid books, but no priced rows reached the dashboard. This is a display/data mismatch; run SCAN ALL again."
+                            else "API تعداد ${scannerState.successfulCount} دفتر سفارش معتبر گزارش کرده، اما ردیف قیمت‌دار به داشبورد نرسیده است. این ناهماهنگی نمایش داده است؛ SCAN ALL را دوباره اجرا کنید.",
+                            color = AfaColorSchemes.loss,
+                            fontSize = 10.sp
+                        )
+                    }
                 } else if (!scannerState.isScanning) {
                     Text(
                         if (english) "No scan results yet. Run a scan to populate this panel."
@@ -634,10 +681,110 @@ private fun DashboardScreen(
             }
         }
 
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(18.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    if (english) "OPEN PAPER POSITIONS" else "نمادهای خریداری‌شده مجازی",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    if (english) "LOCAL PAPER WALLET • arrows compare current price with average entry"
+                    else "کیف پول مجازی محلی • فلش‌ها قیمت فعلی را با میانگین خرید مقایسه می‌کنند",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp
+                )
+                if (paperPositionMarks.isEmpty()) {
+                    Text(
+                        if (english) "No virtual positions yet. Paper buys will appear here."
+                        else "هنوز نماد خریداری‌شده‌ای در کیف پول مجازی نیست؛ خریدهای آزمایشی اینجا نمایش داده می‌شوند.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                } else {
+                    paperPositionMarks.forEach { (position, currentPrice) ->
+                        val pnl = currentPrice?.let {
+                            (it - position.averageEntry) * position.quantity
+                        }
+                        val positionColor = when {
+                            pnl == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                            pnl > 0.0 -> AfaColorSchemes.profit
+                            pnl < 0.0 -> AfaColorSchemes.loss
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(position.symbol, color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text(
+                                        String.format(Locale.US, "%.8f", position.quantity),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 10.sp
+                                    )
+                                    Text(
+                                        if (currentPrice != null) {
+                                            (if (english) "LAST: " else "قیمت: ") +
+                                                String.format(Locale.US, "%,.0f IRR", currentPrice)
+                                        } else {
+                                            if (english) "WAITING FOR FRESH PRICE" else "در انتظار قیمت تازه"
+                                        },
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Text(
+                                        when {
+                                            pnl == null -> "—"
+                                            pnl > 0.0 -> "↑ " + String.format(Locale.US, "%+,.0f IRR", pnl)
+                                            pnl < 0.0 -> "↓ " + String.format(Locale.US, "%+,.0f IRR", pnl)
+                                            else -> "• 0 IRR"
+                                        },
+                                        color = positionColor,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        (if (english) "ENTRY: " else "میانگین خرید: ") +
+                                            String.format(Locale.US, "%,.0f", position.averageEntry),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 9.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Text(
+                    if (english) "These are virtual positions saved on this device. Real Nobitex account positions require authenticated private-account access."
+                    else "این‌ها پوزیشن‌های مجازی ذخیره‌شده روی همین دستگاه هستند. نمایش پوزیشن واقعی نوبیتکس به اتصال امن حساب خصوصی نیاز دارد.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 9.sp
+                )
+            }
+        }
         SectionPanel(
-            title = if (english) "OPEN POSITIONS" else "پوزیشن‌های باز",
-            subtitle = if (english) "Live filled positions will appear here" else "پوزیشن‌های واقعی پس از ثبت و تأیید معامله نمایش داده می‌شوند",
-            empty = if (english) "Private account is not connected. Positions are unavailable." else "حساب خصوصی متصل نیست؛ اطلاعات پوزیشن‌ها در دسترس نیست."
+            title = if (english) "REAL ACCOUNT POSITIONS" else "پوزیشن‌های حساب واقعی",
+            subtitle = if (english) "Authenticated filled positions" else "پوزیشن‌های واقعی تأییدشده",
+            empty = if (english) "Private account is not connected. Real positions are unavailable." else "حساب خصوصی متصل نیست؛ پوزیشن‌های واقعی در دسترس نیستند."
         )
         SectionPanel(
             title = if (english) "TRADE HISTORY" else "تاریخچه معاملات",
@@ -843,6 +990,9 @@ class MainActivity : ComponentActivity() {
             var screen by remember {
                 mutableStateOf(AppScreen.HOME)
             }
+            var paperPortfolio by remember {
+                mutableStateOf(PaperTradingStore.load(this@MainActivity))
+            }
 
             // ViewModel is owned by this Activity and survives
             // Compose recompositions and screen navigation.
@@ -870,6 +1020,12 @@ class MainActivity : ComponentActivity() {
             }
             var marketConnected by remember {
                 mutableStateOf(false)
+            }
+
+            LaunchedEffect(screen) {
+                if (screen == AppScreen.HOME) {
+                    paperPortfolio = PaperTradingStore.load(this@MainActivity)
+                }
             }
 
             LaunchedEffect(screen) {
@@ -941,9 +1097,13 @@ class MainActivity : ComponentActivity() {
                                         marketUpdatedAt = marketUpdatedAt,
                                         marketConnected = marketConnected,
                                         scannerState = scannerState,
+                                        paperPortfolio = paperPortfolio,
                                         onOpenSettings = { screen = AppScreen.SETTINGS },
                                         onOpenScanner = { screen = AppScreen.SCANNER },
                                         onScanMarkets = { scannerViewModel.scanMarkets() },
+                                        onStartEngine = { scannerViewModel.startScannerEngine() },
+                                        onStopEngine = { scannerViewModel.stopScannerEngine() },
+                                        onKillEngine = { scannerViewModel.killScannerEngine() },
                                         onRefreshMarket = {
                                             scope.launch {
                                                 marketLoading = true
