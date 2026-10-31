@@ -99,7 +99,7 @@ class MarketRankingTest {
     }
 
     @Test
-    fun liquidityModesPlaceInvalidMeasurementsAfterValidMarkets() {
+    fun liquidityModesValidateOnlyTheMetricBeingSorted() {
         val input = listOf(
             result("INVALID_BID", bid = Double.NaN, ask = 10_000.0),
             result("VALID_LOW", bid = 10.0, ask = 20.0),
@@ -108,12 +108,12 @@ class MarketRankingTest {
         )
 
         assertEquals(
-            listOf("VALID_HIGH", "VALID_LOW", "INVALID_BID", "INVALID_ASK"),
+            listOf("INVALID_ASK", "VALID_HIGH", "VALID_LOW", "INVALID_BID"),
             MarketRanking.rank(input, MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW)
                 .map { it.symbol }
         )
         assertEquals(
-            listOf("VALID_HIGH", "VALID_LOW", "INVALID_BID", "INVALID_ASK"),
+            listOf("INVALID_BID", "VALID_HIGH", "VALID_LOW", "INVALID_ASK"),
             MarketRanking.rank(input, MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW)
                 .map { it.symbol }
         )
