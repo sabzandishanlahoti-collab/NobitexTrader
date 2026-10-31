@@ -181,7 +181,7 @@ object PaperTradingEngine {
             positionsValue = marketValue,
             unrealizedPnl = unrealized,
             realizedPnl = account.realizedPnl,
-            totalEquity = account.cash + marketValue,
+            totalEquity = account.cash + marketValue - (marketValue * feeRate),
             unpricedPositionCount = unpriced
         )
     }
