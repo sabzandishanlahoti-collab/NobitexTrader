@@ -111,27 +111,31 @@ fun CyberButton(
     }
 }
 
-
 @Composable
 fun CyberStartButton(
     isActive: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val background = if (isActive) Color(0xFF173D38) else Color(0xFF10343B)
     val foreground = if (isActive) Color(0xFF35D6B0) else Color(0xFF35DDE0)
     Button(
         onClick = onClick,
         modifier = modifier.width(88.dp).height(88.dp),
+        enabled = enabled,
         shape = androidx.compose.foundation.shape.CircleShape,
         colors = ButtonDefaults.buttonColors(
             containerColor = background,
-            contentColor = foreground
+            contentColor = foreground,
+            disabledContainerColor = Color(0xFF263442),
+            disabledContentColor = Color(0xFF71818C)
         ),
-        border = BorderStroke(2.dp, foreground),
+        border = BorderStroke(2.dp, if (enabled) foreground else Color(0xFF394957)),
         elevation = ButtonDefaults.buttonElevation(
             defaultElevation = 0.dp,
-            pressedElevation = 3.dp
+            pressedElevation = 3.dp,
+            disabledElevation = 0.dp
         ),
         contentPadding = PaddingValues(8.dp)
     ) {
