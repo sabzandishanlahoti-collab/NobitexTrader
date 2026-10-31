@@ -23,7 +23,8 @@ fun ControlPanel(
     onStopClick: () -> Unit,
     onKillClick: () -> Unit,
     onAutoTradeToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    controlsEnabled: Boolean = false
 ) {
     CyberCard(
         modifier = modifier
@@ -50,7 +51,7 @@ fun ControlPanel(
                         fontSize = 14.sp
                     )
                     Text(
-                        text = "معامله خودکار",
+                        text = if (controlsEnabled) "معامله خودکار" else "موتور معامله هنوز آماده اجرا نیست",
                         color = CyberTokens.TextSecondary,
                         fontSize = 11.sp
                     )
@@ -59,6 +60,7 @@ fun ControlPanel(
                 Switch(
                     checked = isAutoTradeEnabled,
                     onCheckedChange = onAutoTradeToggle,
+                    enabled = controlsEnabled,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = CyberTokens.NeonTurquoise,
                         checkedTrackColor = CyberTokens.NeonTurquoise.copy(alpha = 0.3f),
@@ -75,7 +77,8 @@ fun ControlPanel(
             ) {
                 CyberStartButton(
                     isActive = isBotRunning,
-                    onClick = onStartClick
+                    onClick = onStartClick,
+                    enabled = controlsEnabled
                 )
 
                 Column(
@@ -85,14 +88,16 @@ fun ControlPanel(
                         text = "STOP",
                         isKill = false,
                         onClick = onStopClick,
-                        modifier = Modifier.width(84.dp)
+                        modifier = Modifier.width(84.dp),
+                        enabled = controlsEnabled
                     )
 
                     CyberStopKillButton(
                         text = "KILL",
                         isKill = true,
                         onClick = onKillClick,
-                        modifier = Modifier.width(84.dp)
+                        modifier = Modifier.width(84.dp),
+                        enabled = controlsEnabled
                     )
                 }
             }
