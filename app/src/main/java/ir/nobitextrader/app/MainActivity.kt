@@ -826,7 +826,7 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(screen) {
-                if (screen == AppScreen.HOME) {
+                if (screen == AppScreen.HOME || screen == AppScreen.PAPER_TRADE) {
                     while (true) {
                         marketLoading = marketResult == null
                         marketError = null
