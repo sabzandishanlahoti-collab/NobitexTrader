@@ -332,3 +332,13 @@ Do not wire RiskEngine or RiskLock to placeholder account values, public trade p
 - This section records source-level findings only; it does not add functionality.
 - The previous verified code milestone remains the RiskEngine safety test expansion, commit `d422fa3e06dbfb7425ec15db799bc06d26c119be`, Actions run #345 (success).
 - Subsequent documentation commit and its Actions result must be recorded after exact-SHA verification.
+
+
+## 13. Personal terminal visual and scanner visibility pass — pending CI (2026-10-31)
+- User supplied the visual reference: black background, dark olive/blue-green panels, cyan/turquoise neon accents, green profit, red loss, dense professional trading-terminal layout. This is a personal/home trading tool, not a commercial SKU; visual quality remains a core acceptance criterion.
+- Updated dashboard subtitle to remove Persian exchange branding: English `A.F.A SNIPER • PERSONAL TERMINAL`; Persian `آفا اسنایپر • ترمینال شخصی`. Main brand remains `NOBITEX TRADER A.F.A SNIPER`.
+- Updated dark palette in `AfaTheme.kt` toward near-black background, deep green/navy surfaces, olive undertone, cyan outlines, brighter green profit.
+- Updated `MarketScannerViewModel.buildDisplayedResults`: removed implicit default 1% spread cutoff from result visibility. All scanned markets now flow to the selected explicit result filter; strategy/risk thresholds must not silently hide valid books.
+- This is not yet proof that 443/443 symbols render correctly on-device. The end-to-end symbol display still requires APK/device verification.
+- START/STOP/KILL remain visibly disabled until authenticated account state, order lifecycle, cancellation and emergency-close behavior are implemented and tested. Do not fake live account metrics or execution.
+- Changes committed on `afa-mobile-dashboard-review`; PR #1 remains open and unmerged. CI run #349 for head `90af68c7a4ffa105b512eb025d01f058854f9b3c` was in progress at handoff update time; do not claim green until verified.
