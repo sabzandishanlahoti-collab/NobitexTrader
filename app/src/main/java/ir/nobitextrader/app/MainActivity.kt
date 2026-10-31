@@ -1089,7 +1089,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 AppScreen.BTC_CHART -> BtcChartScreen(english = english)
-                                AppScreen.PAPER_TRADE -> PaperTradeScreen(english = english, market = marketResult, marketUpdatedAt = marketUpdatedAt, feeRatePercent = settings.paperFeePercent.toDouble())
+                                AppScreen.PAPER_TRADE -> PaperTradeScreen(english = english, market = marketResult, marketUpdatedAt = marketUpdatedAt, scannerResults = scannerState.rawResults, feeRatePercent = settings.paperFeePercent.toDouble())
                                 AppScreen.HISTORY -> PaperHistoryScreen(english = english)
                                 AppScreen.WHALE -> SectionPanel(
                                     title = if (english) "WHALE TRACKER" else "ردیاب نهنگ",
