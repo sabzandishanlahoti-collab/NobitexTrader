@@ -9,7 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.HorizontalDivider
@@ -256,8 +255,8 @@ private fun DashboardScreen(
 
         CyberCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AfaPanel),
-            shape = RoundedCornerShape(18.dp)
+            containerColor = AfaPanel,
+            cornerRadius = 18.dp
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -421,8 +420,8 @@ private fun DashboardScreen(
 
         CyberCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AfaPanel),
-            shape = RoundedCornerShape(18.dp)
+            containerColor = AfaPanel,
+            cornerRadius = 18.dp
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -502,7 +501,7 @@ private fun MetricCard(
 ) {
     CyberCard(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = AfaPanel),
+        containerColor = AfaPanel,
         cornerRadius = 15.dp
     ) {
         Column(
@@ -519,8 +518,8 @@ private fun MetricCard(
 private fun SectionPanel(title: String, subtitle: String, empty: String) {
     CyberCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = AfaPanel),
-        shape = RoundedCornerShape(18.dp)
+        containerColor = AfaPanel,
+        cornerRadius = 18.dp
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
