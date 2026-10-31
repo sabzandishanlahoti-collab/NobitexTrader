@@ -112,7 +112,7 @@ internal fun PaperTradeScreen(
                 if (priceIsFresh && priceAgeMs != null) {
                     Text(
                         (if (english) "Updated " else "به‌روزرسانی ") +
-                            "\${priceAgeMs / 1_000L}s " +
+                            "${priceAgeMs / 1_000L}s " +
                             (if (english) "ago" else "پیش"),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 9.sp
