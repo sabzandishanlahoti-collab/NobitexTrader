@@ -743,10 +743,17 @@ private fun MarketResultCard(
                         DataValue("خالص خرید منهای فروش",
                             (if (flow.netQuoteFlow >= 0.0) "+" else "") + formatQuoteLiquidity(flow.netQuoteFlow))
                         Text(
-                            flow.latestTradeTimeMillis?.let { "آخرین معامله: " +
+                            flow.latestTradeTimeMillis?.let { "زمان آخرین معامله: " +
                                 java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(java.util.Date(it)) }
                                 ?: "معامله‌ای در پاسخ اخیر موجود نبود",
                             color = TerminalMuted, fontSize = 10.sp
+                        )
+                        Text(
+                            "زمان دریافت داده: " +
+                                java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                                    .format(java.util.Date(flow.fetchedAtMillis)) +
+                                " • برای تازه‌سازی دوباره دکمه دریافت را بزنید",
+                            color = TerminalAmber, fontSize = 9.sp
                         )
                         Text("نمونه معاملات اخیر API عمومی؛ نه کل معاملات روز و نه سود حساب شخصی.",
                             color = TerminalMuted, fontSize = 9.sp)
