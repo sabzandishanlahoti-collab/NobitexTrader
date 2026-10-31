@@ -5,12 +5,21 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,21 +31,33 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
+import ir.nobitextrader.app.ui.components.CyberCard
+import androidx.compose.foundation.layout.PaddingValues
 import ir.nobitextrader.app.data.MarketStats
 import ir.nobitextrader.app.data.NobitexCandlesApi
 import ir.nobitextrader.app.data.NobitexMarketApi
 import ir.nobitextrader.app.scanner.MarketScannerScreen
+import ir.nobitextrader.app.scanner.MarketScannerUiState
 import ir.nobitextrader.app.scanner.MarketScannerViewModel
 import ir.nobitextrader.app.paper.PaperTradingScreen
+import ir.nobitextrader.app.ui.screens.dashboard.DashboardScreen as CyberDashboardScreen
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,6 +68,472 @@ private enum class AppScreen {
     SETTINGS,
     SCANNER,
     PAPER
+}
+
+
+@androidx.compose.runtime.Composable
+private fun AfaBrandHeader() {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "A",
+            fontSize = 46.sp,
+            fontFamily = FontFamily.Cursive,
+            fontStyle = FontStyle.Italic,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF35DDE0),
+            style = TextStyle(
+                shadow = Shadow(
+                    color = Color(0xFF00DDE8).copy(alpha = 0.85f),
+                    offset = Offset.Zero,
+                    blurRadius = 18f
+                )
+            )
+        )
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(
+            text = "NOBITEX. TRADER.AFA.ESNIPER",
+            maxLines = 1,
+            softWrap = false,
+            fontSize = 14.sp,
+            letterSpacing = (-0.45).sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color(0xFFEAFBFC),
+            style = TextStyle(
+                shadow = Shadow(
+                    color = Color(0xFF35DDE0).copy(alpha = 0.55f),
+                    offset = Offset.Zero,
+                    blurRadius = 9f
+                )
+            )
+        )
+    }
+}
+
+
+private val AfaCyan = Color(0xFF35DDE0)
+private val AfaPanel = Color(0xFF101B2B)
+private val AfaMuted = Color(0xFFA9C2CC)
+private val AfaProfit = Color(0xFF35D6B0)
+private val AfaLoss = Color(0xFFFF647C)
+
+@androidx.compose.runtime.Composable
+private fun DashboardScreen(
+    english: Boolean,
+    marketResult: MarketStats?,
+    marketLoading: Boolean,
+    marketError: String?,
+    scannerState: MarketScannerUiState,
+    onOpenSettings: () -> Unit,
+    onOpenScanner: () -> Unit,
+    onScanMarkets: () -> Unit,
+    onRefreshMarket: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        AfaBrandHeader()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    if (english) "TRADING TERMINAL" else "ترمینال معاملاتی",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Text(
+                    if (english) "NOBITEX • AFA ESNIPER" else "نوبیتکس • آفا اسنایپر",
+                    color = AfaMuted,
+                    fontSize = 11.sp
+                )
+            }
+            androidx.compose.material3.AssistChip(
+                onClick = {},
+                label = { Text(if (english) "READ ONLY" else "فقط مشاهده") },
+            )
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                if (english) "ACCOUNT OVERVIEW" else "نمای کلی سرمایه",
+                color = AfaCyan,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MetricCard(
+                    title = if (english) "INITIAL CAPITAL" else "سرمایه اولیه",
+                    value = "—",
+                    accent = AfaCyan,
+                    modifier = Modifier.weight(1f)
+                )
+                MetricCard(
+                    title = if (english) "IN POSITIONS" else "سرمایه در گردش",
+                    value = "—",
+                    accent = AfaCyan,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MetricCard(
+                    title = if (english) "NET PROFIT" else "سود خالص",
+                    value = "—",
+                    accent = AfaProfit,
+                    modifier = Modifier.weight(1f)
+                )
+                MetricCard(
+                    title = if (english) "NET LOSS" else "ضرر خالص",
+                    value = "—",
+                    accent = AfaLoss,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        CyberCard(
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = AfaPanel,
+            borderColor = Color(0xFF244452),
+            contentPadding = PaddingValues(0.dp),
+            cornerRadius = 18.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    if (english) "ENGINE CONTROL" else "کنترل موتور معاملاتی",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Surface(
+                        color = Color(0xFF4B3B20),
+                        shape = RoundedCornerShape(50)
+                    ) {
+                        Text(
+                            if (english) "NOT CONNECTED" else "اتصال اجرا برقرار نیست",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            color = Color(0xFFFFD18A),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (english) "Order execution is not enabled" else "ثبت سفارش هنوز فعال نشده است",
+                        color = AfaMuted,
+                        fontSize = 11.sp
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
+                        Text("▶ START", fontSize = 11.sp)
+                    }
+                    OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
+                        Text("Ⅱ STOP", fontSize = 11.sp)
+                    }
+                    OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
+                        Text("✕ KILL", fontSize = 11.sp)
+                    }
+                }
+                Text(
+                    if (english) "Controls unlock only after verified private API, order state and emergency-close tests." else "این کلیدها پس از تکمیل و آزمایش API خصوصی، وضعیت سفارش‌ها و توقف اضطراری فعال می‌شوند.",
+                    color = AfaMuted,
+                    fontSize = 10.sp
+                )
+            }
+        }
+
+        CyberCard(
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = AfaPanel,
+            cornerRadius = 18.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            if (english) "MARKET RADAR" else "رادار بازار",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            if (english) "Independent full-screen scanner" else "اسکنر مستقل در صفحه تمام‌صفحه",
+                            color = AfaMuted,
+                            fontSize = 10.sp
+                        )
+                    }
+                    Text("◎", color = AfaCyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onScanMarkets,
+                        enabled = !scannerState.isScanning,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            if (scannerState.isScanning) {
+                                if (english) "SCANNING…" else "در حال اسکن…"
+                            } else {
+                                if (english) "SCAN ALL" else "اسکن همه بازار"
+                            },
+                            fontSize = 11.sp
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onOpenScanner,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            if (english) "OPEN SCANNER →" else "صفحه اسکن ←",
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+                if (scannerState.isScanning || scannerState.totalCount > 0) {
+                    Text(
+                        if (english) {
+                            "Progress: ${scannerState.completedCount} / ${scannerState.totalCount}"
+                        } else {
+                            "پیشرفت: ${scannerState.completedCount} / ${scannerState.totalCount}"
+                        },
+                        color = AfaMuted,
+                        fontSize = 11.sp
+                    )
+                }
+                if (scannerState.results.isNotEmpty()) {
+                    val successful = scannerState.results.count { it.success }
+                    val failed = scannerState.results.size - successful
+                    Text(
+                        if (english) {
+                            "Valid books: $successful   •   Failed: $failed"
+                        } else {
+                            "دفتر سفارش معتبر: $successful   •   ناموفق: $failed"
+                        },
+                        color = AfaMuted,
+                        fontSize = 11.sp
+                    )
+                    scannerState.results
+                        .asSequence()
+                        .filter { it.success }
+                        .take(3)
+                        .forEach { result ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    result.symbol,
+                                    color = AfaCyan,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    (if (english) "Spread " else "اختلاف ") +
+                                        String.format(Locale.US, "%.3f%%", result.spreadPercent),
+                                    color = AfaMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                }
+                scannerState.errorMessage?.let { message ->
+                    Text(message, color = AfaLoss, fontSize = 11.sp)
+                }
+                val analyzedMarkets = scannerState.analysisBySymbol.entries
+                    .filter { it.value.result != null || it.value.error != null || it.value.isLoading }
+                    .take(4)
+                if (analyzedMarkets.isNotEmpty()) {
+                    HorizontalDivider(color = Color(0xFF29404E))
+                    Text(
+                        if (english) "STRATEGY ANALYSIS" else "خلاصه تحلیل استراتژی",
+                        color = AfaCyan,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                    analyzedMarkets.forEach { (symbol, analysisState) ->
+                        val decision = analysisState.result?.decision
+                        val status = when {
+                            analysisState.isLoading -> if (english) "ANALYZING" else "در حال تحلیل"
+                            analysisState.error != null -> if (english) "ERROR" else "خطا"
+                            decision?.isActionable == true -> decision.direction.name
+                            else -> if (english) "NO TRADE" else "بدون معامله"
+                        }
+                        val statusColor = when {
+                            analysisState.isLoading -> AfaMuted
+                            analysisState.error != null -> AfaLoss
+                            decision?.isActionable == true -> AfaProfit
+                            else -> Color(0xFFFFC66D)
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                symbol,
+                                color = AfaCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                status,
+                                color = statusColor,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (decision?.isActionable == true) {
+                            Text(
+                                (if (english) "Agreement " else "توافق ") +
+                                    decision.agreeingStrategyIds.size +
+                                    " • " +
+                                    String.format(Locale.US, "%.1f%%", decision.confidence * 100.0),
+                                color = AfaMuted,
+                                fontSize = 9.sp
+                            )
+                        }
+                    }
+                    Text(
+                        if (english) "Analysis signals only — no order has been placed." else "این‌ها فقط خروجی تحلیل هستند؛ هیچ سفارشی ثبت نشده است.",
+                        color = AfaMuted,
+                        fontSize = 9.sp
+                    )
+                }
+            }
+        }
+
+        CyberCard(
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = AfaPanel,
+            cornerRadius = 18.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (english) "LIVE MARKET SNAPSHOT" else "نمای لحظه‌ای بازار",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold
+                    )
+                    OutlinedButton(onClick = onRefreshMarket, enabled = !marketLoading) {
+                        Text(if (marketLoading) "…" else if (english) "REFRESH" else "بروزرسانی", fontSize = 10.sp)
+                    }
+                }
+                if (marketResult == null) {
+                    Text(
+                        if (english) "No market snapshot loaded yet." else "هنوز اطلاعاتی از بازار دریافت نشده است.",
+                        color = AfaMuted,
+                        fontSize = 12.sp
+                    )
+                } else {
+                    Text("BTC / IRT  •  ${marketResult.market}", color = AfaCyan, fontWeight = FontWeight.Bold)
+                    Text(
+                        (if (english) "Last: " else "آخرین قیمت: ") + marketResult.latest,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        (if (english) "Best bid: " else "بهترین خرید: ") + marketResult.bestBuy +
+                            "     " + (if (english) "Best ask: " else "بهترین فروش: ") + marketResult.bestSell,
+                        color = AfaMuted,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        (if (english) "24h change: " else "تغییر روزانه: ") + marketResult.dayChange + "%",
+                        color = if (marketResult.dayChange >= 0.0) AfaProfit else AfaLoss,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                marketError?.let {
+                    Text(it, color = AfaLoss, fontSize = 11.sp)
+                }
+            }
+        }
+
+        SectionPanel(
+            title = if (english) "OPEN POSITIONS" else "پوزیشن‌های باز",
+            subtitle = if (english) "Live filled positions will appear here" else "پوزیشن‌های واقعی پس از ثبت و تأیید معامله نمایش داده می‌شوند",
+            empty = if (english) "No verified positions to display." else "فعلاً پوزیشن تأییدشده‌ای برای نمایش وجود ندارد."
+        )
+        SectionPanel(
+            title = if (english) "TRADE HISTORY" else "تاریخچه معاملات",
+            subtitle = if (english) "BUY / SELL • PRICE • FEE • REALIZED P&L" else "خرید / فروش • قیمت • کارمزد • سود و زیان قطعی",
+            empty = if (english) "No completed trades recorded yet." else "هنوز معامله تکمیل‌شده‌ای ثبت نشده است."
+        )
+        OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+            Text(if (english) "SETTINGS" else "تنظیمات")
+        }
+        Text(
+            if (english) "Account balance, profit and trade history require verified authenticated exchange data." else "موجودی حساب، سود و تاریخچه معاملات به داده احراز هویت‌شده و تأییدشده صرافی نیاز دارند.",
+            color = AfaMuted,
+            fontSize = 10.sp
+        )
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun MetricCard(
+    title: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    CyberCard(
+        modifier = modifier,
+        containerColor = AfaPanel,
+        cornerRadius = 15.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Text(title, color = AfaMuted, fontSize = 10.sp, maxLines = 1)
+            Text(value, color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 23.sp)
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun SectionPanel(title: String, subtitle: String, empty: String) {
+    CyberCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = AfaPanel,
+        cornerRadius = 18.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = AfaCyan, fontSize = 9.sp)
+            HorizontalDivider(color = Color(0xFF29404E))
+            Text(empty, color = AfaMuted, fontSize = 11.sp)
+        }
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -73,6 +560,7 @@ class MainActivity : ComponentActivity() {
 
             val scope = rememberCoroutineScope()
             val english = settings.useEnglish
+            val scannerState by scannerViewModel.uiState.collectAsState()
 
             var marketResult by remember {
                 mutableStateOf<MarketStats?>(null)
@@ -118,9 +606,26 @@ class MainActivity : ComponentActivity() {
 
             MaterialTheme(
                 colorScheme = if (settings.darkTheme) {
-                    darkColorScheme()
+                    darkColorScheme(
+                        primary = Color(0xFF35DDE0),
+                        onPrimary = Color(0xFF00191B),
+                        secondary = Color(0xFF8CECEF),
+                        background = Color(0xFF070D18),
+                        surface = Color(0xFF101B2B),
+                        surfaceVariant = Color(0xFF19283A),
+                        onBackground = Color(0xFFEAFBFC),
+                        onSurface = Color(0xFFEAFBFC),
+                        onSurfaceVariant = Color(0xFFA9C2CC)
+                    )
                 } else {
-                    lightColorScheme()
+                    lightColorScheme(
+                        primary = Color(0xFF008F98),
+                        secondary = Color(0xFF087E88),
+                        background = Color(0xFFF3FAFB),
+                        surface = Color(0xFFFFFFFF),
+                        onBackground = Color(0xFF102329),
+                        onSurface = Color(0xFF102329)
+                    )
                 }
             ) {
                 Surface(
@@ -172,363 +677,55 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                                                AppScreen.PAPER -> {
+                        AppScreen.PAPER -> {
                             Column(modifier = Modifier.fillMaxSize()) {
                                 Button(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                                     onClick = { screen = AppScreen.HOME }
                                 ) {
                                     Text(if (english) "Back to home" else "بازگشت به صفحه اصلی")
                                 }
-                                PaperTradingScreen(
-                                    modifier = Modifier.fillMaxSize(),
-                                    english = english
-                                )
+                                PaperTradingScreen(modifier = Modifier.fillMaxSize(), english = english)
                             }
                         }
 
-AppScreen.HOME -> {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(24.dp),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "NobitexTrader",
-                                    fontSize = 28.sp
-                                )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Text(
-                                    text = if (english) {
-                                        "Nobitex Trading Bot"
-                                    } else {
-                                        "ربات معاملات نوبیتکس"
-                                    },
-                                    fontSize = 21.sp
-                                )
-
-                                Spacer(modifier = Modifier.height(20.dp))
-
-                                Button(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onClick = {
-                                        screen = AppScreen.SETTINGS
-                                    }
-                                ) {
-                                    Text(
-                                        if (english) "Settings"
-                                        else "تنظیمات"
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                Button(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onClick = {
-                                        screen = AppScreen.SCANNER
-                                    }
-                                ) {
-                                    Text(
-                                        if (english) {
-                                            "Open market scanner"
-                                        } else {
-                                            "ورود به اسکن بازار نوبیتکس"
-                                        }
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                Button(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onClick = { screen = AppScreen.PAPER }
-                                ) {
-                                    Text(if (english) "Paper trading (virtual money)" else "خرید و فروش مجازی با پول کاغذی")
-                                }
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Button(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !marketLoading,
-                                    onClick = {
-                                        scope.launch {
-                                            marketLoading = true
-                                            marketError = null
-
-                                            try {
-                                                marketResult =
-                                                    NobitexMarketApi
-                                                        .fetchMarketStats()
-                                            } catch (e: Exception) {
-                                                marketError =
-                                                    e.message
-                                                        ?: "Unknown market data error"
-                                            } finally {
-                                                marketLoading = false
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    Text(
-                                        when {
-                                            marketLoading && english ->
-                                                "Loading market..."
-                                            marketLoading ->
-                                                "دریافت اطلاعات بازار..."
-                                            english ->
-                                                "Fetch live BTC/IRT market data"
-                                            else ->
-                                                "دریافت اطلاعات واقعی BTC/IRT"
-                                        }
-                                    )
-                                }
-
-                                marketResult?.let { stats ->
-                                    Spacer(
-                                        modifier = Modifier.height(12.dp)
-                                    )
-                                    Text(
-                                        if (english) {
-                                            "Market data received"
-                                        } else {
-                                            "دریافت اطلاعات بازار موفق بود"
-                                        }
-                                    )
-                                    Text("Market: ${stats.market}")
-                                    Text("Last price: ${stats.latest}")
-                                    Text("Best buy: ${stats.bestBuy}")
-                                    Text("Best sell: ${stats.bestSell}")
-                                    Text("Daily change: ${stats.dayChange}%")
-                                }
-
-                                marketError?.let { message ->
-                                    Spacer(
-                                        modifier = Modifier.height(8.dp)
-                                    )
-                                    Text(
-                                        text = message,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Button(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !rawLoading,
-                                    onClick = {
-                                        scope.launch {
-                                            rawLoading = true
-                                            rawResponse = null
-                                            rawError = null
-
-                                            try {
-                                                rawResponse =
-                                                    NobitexMarketApi
-                                                        .fetchRawMarketStatsResponse()
-                                            } catch (e: Exception) {
-                                                rawError =
-                                                    e.message
-                                                        ?: "Unknown raw API error"
-                                            } finally {
-                                                rawLoading = false
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    Text(
-                                        when {
-                                            rawLoading && english ->
-                                                "Fetching raw response..."
-                                            rawLoading ->
-                                                "در حال دریافت پاسخ خام..."
-                                            english ->
-                                                "Show raw Nobitex API response"
-                                            else ->
-                                                "نمایش پاسخ خام نوبیتکس"
-                                        }
-                                    )
-                                }
-
-                                rawResponse?.let { response ->
-                                    Spacer(
-                                        modifier = Modifier.height(8.dp)
-                                    )
-                                    Text(
-                                        if (english) {
-                                            "Raw API response:"
-                                        } else {
-                                            "پاسخ خام API:"
-                                        }
-                                    )
-                                    Text(
-                                        text = response,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                }
-
-                                rawError?.let { message ->
-                                    Spacer(
-                                        modifier = Modifier.height(8.dp)
-                                    )
-                                    Text(
-                                        text = message,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(24.dp))
-
-                                Button(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    enabled = !candlesLoading,
-                                    onClick = {
-                                        scope.launch {
-                                            candlesLoading = true
-                                            candleError = null
-                                            candleCount = null
-                                            lastCandleTime = null
-
-                                            try {
-                                                val nowSeconds =
-                                                    System.currentTimeMillis() /
-                                                        1000L
-
-                                                val candles =
-                                                    NobitexCandlesApi.fetchCandles(
-                                                        symbol = "BTCIRT",
-                                                        resolution = "60",
-                                                        fromUnixSeconds =
-                                                            nowSeconds -
-                                                                24L * 60L * 60L,
-                                                        toUnixSeconds =
-                                                            nowSeconds
-                                                    )
-
-                                                candleCount = candles.size
-
-                                                lastCandleTime =
-                                                    candles.lastOrNull()?.let {
-                                                        candle ->
-                                                        SimpleDateFormat(
-                                                            "yyyy-MM-dd HH:mm:ss",
-                                                            Locale.getDefault()
-                                                        ).format(
-                                                            Date(
-                                                                candle.timestampMillis
-                                                            )
-                                                        )
-                                                    }
-                                            } catch (e: Exception) {
-                                                candleError =
-                                                    e.message
-                                                        ?: "Unknown candle API error"
-                                            } finally {
-                                                candlesLoading = false
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    Text(
-                                        when {
-                                            candlesLoading && english ->
-                                                "Fetching live candles..."
-                                            candlesLoading ->
-                                                "در حال دریافت کندل..."
-                                            english ->
-                                                "Test live BTC/IRT candles"
-                                            else ->
-                                                "آزمایش دریافت کندل واقعی BTC/IRT"
-                                        }
-                                    )
-                                }
-
-                                if (
-                                    candlesLoading ||
-                                    rawLoading ||
-                                    marketLoading
-                                ) {
-                                    Spacer(
-                                        modifier = Modifier.height(12.dp)
-                                    )
-                                    CircularProgressIndicator()
-                                }
-
-                                candleCount?.let { count ->
-                                    Spacer(
-                                        modifier = Modifier.height(12.dp)
-                                    )
-                                    Text(
-                                        if (english) {
-                                            "Candle request completed"
-                                        } else {
-                                            "درخواست کندل پایان یافت"
-                                        }
-                                    )
-                                    Text(
-                                        if (english) {
-                                            "Candles received: $count"
-                                        } else {
-                                            "تعداد کندل دریافتی: $count"
-                                        }
-                                    )
-
-                                    lastCandleTime?.let { time ->
-                                        Text(
-                                            if (english) {
-                                                "Latest candle time: $time"
-                                            } else {
-                                                "زمان آخرین کندل: $time"
-                                            }
-                                        )
-                                    }
-
-                                    if (count == 0) {
-                                        Text(
-                                            if (english) {
-                                                "The API returned no candles for this interval."
-                                            } else {
-                                                "API برای این بازه هیچ کندلی برنگرداند."
-                                            }
-                                        )
-                                    }
-                                }
-
-                                candleError?.let { message ->
-                                    Spacer(
-                                        modifier = Modifier.height(12.dp)
-                                    )
-                                    Text(
-                                        text = if (english) {
-                                            "Candle request failed: $message"
-                                        } else {
-                                            "خطای دریافت کندل: $message"
-                                        },
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(20.dp))
-
-                                Text(
-                                    text = if (english) {
-                                        "Read-only tests. No orders are placed."
-                                    } else {
-                                        "این آزمایش‌ها فقط اطلاعات بازار و کندل را می‌خوانند و سفارشی ثبت نمی‌کنند."
-                                    },
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
+                        AppScreen.HOME -> {
+                            CyberDashboardScreen(
+                                isConnected = false,
+                                batteryLevel = null,
+                                onSettingsClick = { screen = AppScreen.SETTINGS },
+                                tickers = emptyList(),
+                                initialCapital = "—",
+                                capitalInUse = "—",
+                                netProfit = "—",
+                                isProfitPositive = null,
+                                depositWithdraw = "—",
+                                totalTrades = "—",
+                                isBotRunning = false,
+                                isAutoTradeEnabled = false,
+                                onStartClick = {},
+                                onStopClick = {},
+                                onKillClick = {},
+                                onAutoTradeToggle = {},
+                                longPositionsCount = "—",
+                                longPositionsVolume = "—",
+                                shortPositionsCount = "—",
+                                shortPositionsVolume = "—",
+                                todayBuysCount = "—",
+                                todayBuysVolume = "—",
+                                todaySellsCount = "—",
+                                todaySellsVolume = "—",
+                                onScannerClick = { screen = AppScreen.SCANNER },
+                                onPaperTradingClick = { screen = AppScreen.PAPER },
+                                onScanMarketsClick = { scannerViewModel.scanMarkets() },
+                                isScanning = scannerState.isScanning,
+                                scanProgressText = if (scannerState.totalCount > 0) {
+                                    "پیشرفت اسکن: ${scannerState.completedCount} / ${scannerState.totalCount}"
+                                } else {
+                                    null
+                                },
+                                engineControlsEnabled = false
+                            )
                         }
                     }
                 }
