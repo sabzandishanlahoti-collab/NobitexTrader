@@ -29,6 +29,21 @@ data class PublicTradeFlowSummary(
 ) {
     companion object {
         fun from(trades: List<PublicTrade>): PublicTradeFlowSummary {
+            trades.forEachIndexed { index, trade ->
+                require(trade.timeMillis > 0L) {
+                    "Public trade timestamp must be positive at index $index"
+                }
+                require(trade.price.isFinite() && trade.price > 0.0) {
+                    "Public trade price must be finite and positive at index $index"
+                }
+                require(trade.volume.isFinite() && trade.volume >= 0.0) {
+                    "Public trade volume must be finite and non-negative at index $index"
+                }
+                require(trade.quoteVolume.isFinite() && trade.quoteVolume >= 0.0) {
+                    "Public trade quote volume must be finite and non-negative at index $index"
+                }
+            }
+
             val buys = trades.filter { it.type == TradeSide.BUY }
             val sells = trades.filter { it.type == TradeSide.SELL }
             val buyVolume = sumFiniteQuoteVolume(buys)
