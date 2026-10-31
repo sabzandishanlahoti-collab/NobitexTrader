@@ -223,6 +223,40 @@ class StrategyAnalysisCoordinatorTest {
     }
 
     @Test
+    fun disabledStrategyIdsAreNotEvaluatedAndEmptySelectionExplainsNoTrade() = runBlocking {
+        val first = StubStrategy(StrategyId.FVG) { signal(StrategyId.FVG, it.symbol) }
+        val second = StubStrategy(StrategyId.MICRO_SCALPER) { signal(StrategyId.MICRO_SCALPER, it.symbol) }
+        val coordinator = StrategyAnalysisCoordinator(
+            candleLoader = { _, _, _, _ -> candles },
+            strategies = listOf(first, second)
+        )
+
+        val onlyFvg = coordinator.analyze(
+            symbol = "BTCIRT",
+            resolution = "5",
+            fromUnixSeconds = 100L,
+            toUnixSeconds = 200L,
+            enabledStrategyIds = setOf(StrategyId.FVG),
+            minimumAgreement = 1
+        )
+        assertEquals(1, first.calls)
+        assertEquals(0, second.calls)
+        assertEquals(1, onlyFvg.batch?.expectedStrategyCount)
+        assertTrue(onlyFvg.isActionable)
+
+        val noneEnabled = coordinator.analyze(
+            symbol = "BTCIRT",
+            resolution = "5",
+            fromUnixSeconds = 100L,
+            toUnixSeconds = 200L,
+            enabledStrategyIds = emptySet()
+        )
+        assertEquals(0, noneEnabled.batch?.expectedStrategyCount)
+        assertFalse(noneEnabled.isActionable)
+        assertEquals("No strategy is enabled", noneEnabled.decision?.reason)
+    }
+
+    @Test
     fun defaultStrategiesExcludeWhaleWithoutRealTradeFlow() {
         val ids = StrategyAnalysisCoordinator.defaultStrategies().map { it.id }
 
