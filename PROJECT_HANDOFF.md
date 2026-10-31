@@ -257,3 +257,21 @@ The default coordinator registers five candle-only strategies, in this order:
 - Workflow URL: https://github.com/sabzandishanlahoti-collab/NobitexTrader/actions/runs/41202289246
 - Scope is backtest correctness and unit-test/build verification only. This does not verify live execution, exchange integration, or strategy profitability.
 
+
+
+## 11. Candle-series validation — implementation and verified tests (2026-10-31)
+
+- Added validation at the public candle API boundary in `app/src/main/java/ir/nobitextrader/app/data⁠/NobitexCandlesApi.kt`.
+- Added deterministic unit tests in `app/src/test/java/ir/nobitextrader/app/data/NobitexCandlesApiTest.kt`.
+- The validator currently:
+  - Allows an empty response to pass through so the API's documented no-data case remains representable.
+  - Requires at least 20 candles for a non-empty series.
+  - Rejects unsupported resolutions, invalid/non-positive timestamps, millisecond timestamps, duplicate or out-of-order timestamps, and non-contiguous intervals.
+  - Rejects a latest candle that is not fully closed, lies in the future, or is older than three intervals.
+- The freshness allowance was set to three intervals to tolerate UDF end-boundary behavior; the stale-candle regression test was adjusted to exceed that threshold.
+- Added tests for a fresh continuous series, duplicate timestamps, a missing interval, stale latest candle, an unclosed latest candle, insufficient history, and unsupported resolution.
+- Verified branch-head commit: `d92bf86a05cb4cbbc369ee72e9261496b6fe5da4`.
+- Exact-SHA workflow: Android APK Build and Tests, run #342 — **success**. Unit tests, Debug APK assembly, and artifact upload all completed successfully.
+- Workflow URL: https://github.com/sabzandishanlahoti-collab/NobitexTrader/actions/runs/41203096162
+- Important limitation: the official Nobitex UDF documentation describes resolutions and response parameters but does not explicitly guarantee that every interval has a candle when no trades occur. Therefore, rejecting every interval gap is currently a conservative implementation assumption, **not yet validated against live UDF behavior**. Before treating this validator as integration-verified, inspect controlled live responses across low-activity markets and confirm whether missing intervals are expected. If legitimate no-trade gaps occur, revise the policy to distinguish missing data from no-trade intervals without silently fabricating candles.
+- Status: **Build/test verified**. Not live API integration verified; not production verified.
