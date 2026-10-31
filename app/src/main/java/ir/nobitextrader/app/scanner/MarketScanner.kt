@@ -25,7 +25,13 @@ data class MarketScanResult(
     val bidLiquidityTop5: Double,
     val askLiquidityTop5: Double,
     val success: Boolean,
-    val error: String? = null
+    val error: String? = null,
+    /**
+     * Local receipt time for this exact order-book response.
+     * This is not an exchange event timestamp; it only bounds how long
+     * the app may treat the received snapshot as fresh.
+     */
+    val observedAtMillis: Long = 0L
 )
 
 object MarketScanner {
@@ -237,7 +243,8 @@ object MarketScanner {
             spreadPercent = spreadPercent.coerceAtLeast(0.0),
             bidLiquidityTop5 = bidLiquidity,
             askLiquidityTop5 = askLiquidity,
-            success = true
+            success = true,
+            observedAtMillis = System.currentTimeMillis()
         )
     }
 }
