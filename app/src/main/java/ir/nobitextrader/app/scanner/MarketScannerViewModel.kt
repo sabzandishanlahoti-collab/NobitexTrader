@@ -8,6 +8,7 @@ import ir.nobitextrader.app.data.PublicTrade
 import ir.nobitextrader.app.data.TradeSide
 import ir.nobitextrader.app.strategy.StrategyAnalysisCoordinator
 import ir.nobitextrader.app.strategy.StrategyAnalysisResult
+import ir.nobitextrader.app.strategy.StrategyId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -130,6 +131,8 @@ class MarketScannerViewModel(
         MarketRefreshPolicy.DEFAULT.maxMarketsPerBatch
 
     private var maxSpreadPercent = 1f
+    private var enabledStrategyIds: Set<StrategyId> = StrategyAnalysisCoordinator.defaultStrategies().map { it.id }.toSet()
+    private var minimumStrategyAgreement: Int = 2
 
     fun applySettings(settings: TraderSettings) {
         requestTimeoutMs =
@@ -140,6 +143,14 @@ class MarketScannerViewModel(
 
         maxSpreadPercent =
             settings.maxSpreadPercent.coerceIn(0.1f, 10f)
+        enabledStrategyIds = buildSet {
+            if (settings.strategyFmcEnabled) add(StrategyId.FMC)
+            if (settings.strategyFvgEnabled) add(StrategyId.FVG)
+            if (settings.strategyLiquiditySweepEnabled) add(StrategyId.LIQUIDITY_SWEEP)
+            if (settings.strategyOrderBlockEnabled) add(StrategyId.ORDER_BLOCK)
+            if (settings.strategyMicroScalperEnabled) add(StrategyId.MICRO_SCALPER)
+        }
+        minimumStrategyAgreement = settings.minimumStrategyAgreement.coerceIn(1, 5)
 
         val refreshMs =
             settings.refreshSeconds.coerceIn(5, 3600) * 1_000L
@@ -447,7 +458,9 @@ class MarketScannerViewModel(
                     symbol = normalizedSymbol,
                     resolution = DEFAULT_CANDLE_RESOLUTION,
                     fromUnixSeconds = window.fromUnixSeconds,
-                    toUnixSeconds = window.toUnixSeconds
+                    toUnixSeconds = window.toUnixSeconds,
+                    enabledStrategyIds = enabledStrategyIds,
+                    minimumAgreement = minimumStrategyAgreement
                 )
                 _uiState.value = _uiState.value.copy(
                     analysisBySymbol = _uiState.value.analysisBySymbol +
