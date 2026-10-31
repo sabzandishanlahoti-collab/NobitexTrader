@@ -299,12 +299,11 @@ class MarketScannerViewModel(
         sortMode: MarketSortMode,
         filterMode: MarketResultFilterMode
     ): List<MarketScanResult> {
-        val spreadFiltered = results.filter {
-            !it.success || it.spreadPercent <= maxSpreadPercent
-        }
-
+        // Keep every successfully scanned symbol visible by default.
+        // Spread thresholds must not silently hide valid market books.
+        // Users can still apply an explicit result filter from the scanner UI.
         return MarketResultFilter.apply(
-            MarketScanner.sortResults(spreadFiltered, sortMode, _uiState.value.tradeFlowBySymbol),
+            MarketScanner.sortResults(results, sortMode, _uiState.value.tradeFlowBySymbol),
             filterMode
         )
     }
