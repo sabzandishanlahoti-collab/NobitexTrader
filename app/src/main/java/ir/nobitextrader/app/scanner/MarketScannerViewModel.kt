@@ -260,7 +260,7 @@ class MarketScannerViewModel(
         }
 
         return MarketResultFilter.apply(
-            MarketScanner.sortResults(spreadFiltered, sortMode),
+            MarketScanner.sortResults(spreadFiltered, sortMode, _uiState.value.tradeFlowBySymbol),
             filterMode
         )
     }
