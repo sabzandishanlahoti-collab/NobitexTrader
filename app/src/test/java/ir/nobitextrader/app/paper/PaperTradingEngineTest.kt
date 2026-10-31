@@ -47,7 +47,7 @@ class PaperTradingEngineTest {
     @Test fun valuationMarksOpenPositionsAtBidAndIncludesExitFeeEstimate() {
         val bought = PaperTradingEngine.buy(PaperAccount.create(1_000.0), "BTCIRT", 100.0, 500.0)
         val value = PaperTradingEngine.value(bought, mapOf("BTCIRT" to 110.0))
-        assertEquals(1_049.5, value.totalEquity, 1e-8)
+        assertEquals(1_048.95, value.totalEquity, 1e-8)
         assertEquals(48.95, value.unrealizedPnl, 1e-8)
     }
 }
