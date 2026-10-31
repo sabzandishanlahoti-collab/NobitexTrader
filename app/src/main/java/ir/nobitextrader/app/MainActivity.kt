@@ -878,11 +878,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 AppScreen.BTC_CHART -> BtcChartScreen(english = english)
-                                AppScreen.PAPER_TRADE -> SectionPanel(
-                                    title = if (english) "MANUAL PAPER TRADE" else "معامله دستی مجازی",
-                                    subtitle = if (english) "VIRTUAL WALLET • REAL PUBLIC PRICES" else "کیف پول مجازی • قیمت عمومی واقعی",
-                                    empty = if (english) "Paper wallet and transaction ledger are not implemented yet. No real orders are sent." else "کیف پول و دفتر معاملات مجازی هنوز پیاده‌سازی نشده‌اند؛ هیچ سفارش واقعی ارسال نمی‌شود."
-                                )
+                                AppScreen.PAPER_TRADE -> PaperTradeScreen(english = english, market = marketResult)
                                 AppScreen.HISTORY -> SectionPanel(
                                     title = if (english) "TRADE HISTORY" else "تاریخچه معاملات",
                                     subtitle = if (english) "PAPER AND VERIFIED EXECUTIONS" else "معاملات مجازی و اجراهای تأییدشده",
