@@ -94,6 +94,8 @@ data class StrategyAnalysisUiState(
 data class MarketScannerUiState(
     val isScanning: Boolean = false,
     val results: List<MarketScanResult> = emptyList(),
+    // Unfiltered source results keep the dashboard independent from scanner UI filters.
+    val rawResults: List<MarketScanResult> = emptyList(),
     val errorMessage: String? = null,
     val completedCount: Int = 0,
     val totalCount: Int = 0,
@@ -233,6 +235,7 @@ class MarketScannerViewModel(
                                         sortMode = current.sortMode,
                                         filterMode = current.filterMode
                                     ),
+                                    rawResults = snapshot,
                                     completedCount = snapshot.size,
                                     successfulCount = snapshot.count { it.success },
                                     failedCount = snapshot.count { !it.success }
@@ -268,6 +271,7 @@ class MarketScannerViewModel(
                         sortMode = current.sortMode,
                         filterMode = current.filterMode
                     ),
+                    rawResults = allResults,
                     errorMessage = null,
                     completedCount = results.size,
                     totalCount = results.size,
@@ -288,6 +292,7 @@ class MarketScannerViewModel(
                             sortMode = current.sortMode,
                             filterMode = current.filterMode
                         ),
+                        rawResults = allResults,
                         errorMessage = e.message
                             ?: "اسکن بازار ناموفق بود.",
                         successfulCount = allResults.count { it.success },
@@ -365,6 +370,46 @@ class MarketScannerViewModel(
         if (_uiState.value.autoRefreshEnabled) {
             startAutoRefresh()
         }
+    }
+
+    /**
+     * Starts the public-market scanner and periodic refresh.
+     * This does not place exchange orders.
+     */
+    fun startScannerEngine() {
+        if (!_uiState.value.autoRefreshEnabled) {
+            _uiState.value = _uiState.value.copy(autoRefreshEnabled = true)
+            startAutoRefresh()
+        }
+        scanMarkets()
+    }
+
+    /**
+     * Stops periodic scanning and cancels the active market request.
+     * Previously received market rows remain visible.
+     */
+    fun stopScannerEngine() {
+        stopAutoRefresh()
+        cancelScan()
+    }
+
+    /**
+     * Emergency-stops scanner, analysis and public-trade fetch jobs.
+     * It does not cancel or close any exchange order or position.
+     */
+    fun killScannerEngine() {
+        stopAutoRefresh()
+        cancelScan()
+        analysisJobs.values.forEach { it.cancel() }
+        analysisJobs.clear()
+        tradeJobs.values.forEach { it.cancel() }
+        tradeJobs.clear()
+        _uiState.value = _uiState.value.copy(
+            isScanning = false,
+            autoRefreshEnabled = false,
+            analysisBySymbol = emptyMap(),
+            tradeLoadingSymbols = emptySet()
+        )
     }
 
     fun toggleAutoRefresh() {
@@ -494,6 +539,7 @@ class MarketScannerViewModel(
         _uiState.value = _uiState.value.copy(
             isScanning = false,
             results = emptyList(),
+            rawResults = emptyList(),
             errorMessage = null,
             completedCount = 0,
             totalCount = 0,
