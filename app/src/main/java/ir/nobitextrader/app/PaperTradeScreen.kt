@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.nobitextrader.app.data.MarketStats
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -44,6 +46,8 @@ internal fun PaperTradeScreen(
     var portfolio by remember { mutableStateOf(PaperTradingStore.load(context)) }
     var quantityText by remember { mutableStateOf("0.001") }
     var message by remember { mutableStateOf<String?>(null) }
+    var autoRunning by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(Unit) {
@@ -212,6 +216,58 @@ internal fun PaperTradeScreen(
                 enabled = paperTradeEnabled
             ) { Text(if (english) "SELL • PAPER" else "فروش مجازی") }
         }
+        Button(
+            onClick = {
+                if (!autoRunning) {
+                    autoRunning = true
+                    message = if (english) "Running one BTC strategy cycle…" else "در حال اجرای یک چرخه تحلیل و معامله BTC…"
+                    scope.launch {
+                        try {
+                            when (val result = PaperAutoTradingRunner.runBtcOnce(
+                                context,
+                                TraderSettingsStore.load(context)
+                            )) {
+                                is PaperAutoTradingRunner.Result.Executed -> {
+                                    portfolio = result.portfolio
+                                    message = if (english) {
+                                        "AUTO PAPER ${result.side} recorded: ${String.format(Locale.US, "%.8f", result.quantity)} BTC at ${String.format(Locale.US, "%,.0f", result.price)} IRR."
+                                    } else {
+                                        "خریدوفروش خودکار مجازی ثبت شد: ${result.side}، مقدار ${String.format(Locale.US, "%.8f", result.quantity)} BTC با قیمت ${String.format(Locale.US, "%,.0f", result.price)} ریال."
+                                    }
+                                }
+                                is PaperAutoTradingRunner.Result.Rejected -> {
+                                    message = result.reason
+                                }
+                            }
+                        } catch (e: Exception) {
+                            message = e.message ?: if (english) "Automatic paper cycle failed." else "چرخه خودکار مجازی ناموفق بود."
+                        } finally {
+                            autoRunning = false
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = feeIsConfigured && !autoRunning
+        ) {
+            Text(
+                when {
+                    autoRunning && english -> "RUNNING BTC PAPER CYCLE…"
+                    autoRunning -> "در حال اجرا…"
+                    english -> "RUN ONE AUTO PAPER CYCLE • BTC"
+                    else -> "اجرای یک چرخه خریدوفروش خودکار مجازی • BTC"
+                }
+            )
+        }
+        Text(
+            if (english) {
+                "One-shot test only • closed 15-minute candles + fresh BTC order book • max order 1% of cash, capped at 10,000,000 IRR • no real orders."
+            } else {
+                "فقط اجرای آزمایشی تک‌مرحله‌ای • کندل بسته‌شده ۱۵ دقیقه‌ای + دفتر سفارش تازه BTC • سقف سفارش ۱٪ موجودی و حداکثر ۱۰٬۰۰۰٬۰۰۰ ریال • بدون سفارش واقعی."
+            },
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 9.sp
+        )
         message?.let {
             Text(
                 it,
