@@ -259,7 +259,7 @@ internal object CandleSeriesValidator {
         require(latestSeconds + intervalSeconds <= nowUnixSeconds) {
             "Latest candle is not fully closed"
         }
-        require(nowUnixSeconds - latestSeconds <= intervalSeconds * 2L) {
+        require(nowUnixSeconds - latestSeconds <= intervalSeconds * 3L) {
             "Candle history is stale"
         }
     }
