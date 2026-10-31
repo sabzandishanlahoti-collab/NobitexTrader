@@ -110,3 +110,57 @@ fun CyberButton(
         }
     }
 }
+
+
+@Composable
+fun CyberStartButton(
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val background = if (isActive) Color(0xFF173D38) else Color(0xFF10343B)
+    val foreground = if (isActive) Color(0xFF35D6B0) else Color(0xFF35DDE0)
+    Button(
+        onClick = onClick,
+        modifier = modifier.width(88.dp).height(88.dp),
+        shape = androidx.compose.foundation.shape.CircleShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = background,
+            contentColor = foreground
+        ),
+        border = BorderStroke(2.dp, foreground),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 0.dp,
+            pressedElevation = 3.dp
+        ),
+        contentPadding = PaddingValues(8.dp)
+    ) {
+        Text(
+            text = if (isActive) "RUNNING" else "START",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.4.sp
+        )
+    }
+}
+
+@Composable
+fun CyberStopKillButton(
+    text: String,
+    isKill: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    CyberButton(
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        style = if (isKill) CyberButtonStyle.DANGER else CyberButtonStyle.OUTLINED,
+        height = 40.dp,
+        containerColor = if (isKill) Color(0xFF321923) else Color(0xFF101B2B),
+        contentColor = if (isKill) Color(0xFFFF647C) else Color(0xFF35DDE0),
+        borderColor = if (isKill) Color(0xFFFF647C) else Color(0xFF35DDE0)
+    )
+}
