@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -63,7 +65,11 @@ import java.util.Locale
 private enum class AppScreen {
     HOME,
     SETTINGS,
-    SCANNER
+    SCANNER,
+    BTC_CHART,
+    PAPER_TRADE,
+    HISTORY,
+    WHALE
 }
 
 
@@ -735,6 +741,48 @@ private fun SectionPanel(title: String, subtitle: String, empty: String) {
     }
 }
 
+@androidx.compose.runtime.Composable
+private fun TerminalBottomNavigation(
+    selected: AppScreen,
+    english: Boolean,
+    onSelect: (AppScreen) -> Unit
+) {
+    val items = listOf(
+        AppScreen.HOME to if (english) "HOME" else "خانه",
+        AppScreen.SCANNER to if (english) "SCAN" else "اسکن",
+        AppScreen.BTC_CHART to if (english) "BTC" else "بیت‌کوین",
+        AppScreen.PAPER_TRADE to if (english) "PAPER" else "مجازی",
+        AppScreen.HISTORY to if (english) "HISTORY" else "تاریخچه",
+        AppScreen.WHALE to if (english) "WHALE" else "نهنگ",
+        AppScreen.SETTINGS to if (english) "SET" else "تنظیمات"
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline)
+            .padding(horizontal = 2.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items.forEach { (destination, label) ->
+            TextButton(
+                onClick = { onSelect(destination) },
+                modifier = Modifier.weight(1f),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 1.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    label,
+                    color = if (selected == destination) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 8.sp,
+                    fontWeight = if (selected == destination) FontWeight.ExtraBold else FontWeight.Medium,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -811,81 +859,82 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    when (screen) {
-                        AppScreen.SETTINGS -> {
-                            SettingsScreen(
-                                modifier = Modifier.fillMaxSize(),
-                                onBack = {
-                                    settings = TraderSettingsStore.load(
-                                        this@MainActivity
-                                    )
-                                    screen = AppScreen.HOME
-                                }
-                            )
-                        }
-
-                        AppScreen.SCANNER -> {
-                            Column(
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Button(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            horizontal = 12.dp,
-                                            vertical = 6.dp
-                                        ),
-                                    onClick = {
-                                        screen = AppScreen.HOME
-                                    }
-                                ) {
-                                    Text(
-                                        if (english) {
-                                            "Back to home"
-                                        } else {
-                                            "بازگشت به صفحه اصلی"
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            when (screen) {
+                                AppScreen.SETTINGS -> {
+                                    SettingsScreen(
+                                        modifier = Modifier.fillMaxSize(),
+                                        onBack = {
+                                            settings = TraderSettingsStore.load(this@MainActivity)
+                                            screen = AppScreen.HOME
                                         }
                                     )
                                 }
-
-                                MarketScannerScreen(
-                                    viewModel = scannerViewModel,
-                                    modifier = Modifier
-                                        .fillMaxSize()
+                                AppScreen.SCANNER -> {
+                                    MarketScannerScreen(
+                                        viewModel = scannerViewModel,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                                AppScreen.BTC_CHART -> BtcChartScreen(english = english)
+                                AppScreen.PAPER_TRADE -> SectionPanel(
+                                    title = if (english) "MANUAL PAPER TRADE" else "معامله دستی مجازی",
+                                    subtitle = if (english) "VIRTUAL WALLET • REAL PUBLIC PRICES" else "کیف پول مجازی • قیمت عمومی واقعی",
+                                    empty = if (english) "Paper wallet and transaction ledger are not implemented yet. No real orders are sent." else "کیف پول و دفتر معاملات مجازی هنوز پیاده‌سازی نشده‌اند؛ هیچ سفارش واقعی ارسال نمی‌شود."
                                 )
+                                AppScreen.HISTORY -> SectionPanel(
+                                    title = if (english) "TRADE HISTORY" else "تاریخچه معاملات",
+                                    subtitle = if (english) "PAPER AND VERIFIED EXECUTIONS" else "معاملات مجازی و اجراهای تأییدشده",
+                                    empty = if (english) "No persisted paper-trade ledger is available yet." else "هنوز دفتر معاملات مجازی ذخیره‌شده‌ای وجود ندارد."
+                                )
+                                AppScreen.WHALE -> SectionPanel(
+                                    title = if (english) "WHALE TRACKER" else "ردیاب نهنگ",
+                                    subtitle = if (english) "PUBLIC ON-CHAIN DATA ONLY" else "فقط داده عمومی روی زنجیره",
+                                    empty = if (english) "No verified chain data source is configured. Exchange order books do not identify individual traders." else "منبع معتبر داده زنجیره‌ای تنظیم نشده است؛ دفتر سفارش صرافی هویت معامله‌گران را مشخص نمی‌کند."
+                                )
+                                AppScreen.HOME -> {
+                                    DashboardScreen(
+                                        english = english,
+                                        marketResult = marketResult,
+                                        marketLoading = marketLoading,
+                                        marketError = marketError,
+                                        marketUpdatedAt = marketUpdatedAt,
+                                        marketConnected = marketConnected,
+                                        scannerState = scannerState,
+                                        onOpenSettings = { screen = AppScreen.SETTINGS },
+                                        onOpenScanner = { screen = AppScreen.SCANNER },
+                                        onScanMarkets = { scannerViewModel.scanMarkets() },
+                                        onRefreshMarket = {
+                                            scope.launch {
+                                                marketLoading = true
+                                                marketError = null
+                                                try {
+                                                    marketResult = NobitexMarketApi.fetchMarketStats()
+                                                    marketUpdatedAt = System.currentTimeMillis()
+                                                    marketConnected = true
+                                                } catch (e: Exception) {
+                                                    marketConnected = false
+                                                    marketError = e.message ?: "Unknown market data error"
+                                                } finally {
+                                                    marketLoading = false
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
-
-                        AppScreen.HOME -> {
-                            DashboardScreen(
-                                english = english,
-                                marketResult = marketResult,
-                                marketLoading = marketLoading,
-                                marketError = marketError,
-                                marketUpdatedAt = marketUpdatedAt,
-                                marketConnected = marketConnected,
-                                scannerState = scannerState,
-                                onOpenSettings = { screen = AppScreen.SETTINGS },
-                                onOpenScanner = { screen = AppScreen.SCANNER },
-                                onScanMarkets = { scannerViewModel.scanMarkets() },
-                                onRefreshMarket = {
-                                    scope.launch {
-                                        marketLoading = true
-                                        marketError = null
-                                        try {
-                                            marketResult = NobitexMarketApi.fetchMarketStats()
-                                            marketUpdatedAt = System.currentTimeMillis()
-                                            marketConnected = true
-                                        } catch (e: Exception) {
-                                            marketConnected = false
-                                            marketError = e.message ?: "Unknown market data error"
-                                        } finally {
-                                            marketLoading = false
-                                        }
-                                    }
+                        TerminalBottomNavigation(
+                            selected = screen,
+                            english = english,
+                            onSelect = { destination ->
+                                if (destination == AppScreen.SETTINGS) {
+                                    settings = TraderSettingsStore.load(this@MainActivity)
                                 }
-                            )
-                        }
+                                screen = destination
+                            }
+                        )
                     }
                 }
             }
