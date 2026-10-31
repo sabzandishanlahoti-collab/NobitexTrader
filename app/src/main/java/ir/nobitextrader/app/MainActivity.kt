@@ -49,6 +49,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
+import ir.nobitextrader.app.ui.components.CyberCard
+import androidx.compose.foundation.layout.PaddingValues
 import ir.nobitextrader.app.data.MarketStats
 import ir.nobitextrader.app.data.NobitexCandlesApi
 import ir.nobitextrader.app.data.NobitexMarketApi
@@ -197,10 +199,12 @@ private fun DashboardScreen(
             }
         }
 
-        androidx.compose.material3.Card(
+        CyberCard(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AfaPanel),
-            shape = RoundedCornerShape(18.dp)
+            containerColor = AfaPanel,
+            borderColor = Color(0xFF244452),
+            contentPadding = PaddingValues(0.dp),
+            cornerRadius = 18.dp
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
@@ -250,7 +254,7 @@ private fun DashboardScreen(
             }
         }
 
-        androidx.compose.material3.Card(
+        CyberCard(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = AfaPanel),
             shape = RoundedCornerShape(18.dp)
@@ -415,7 +419,7 @@ private fun DashboardScreen(
             }
         }
 
-        androidx.compose.material3.Card(
+        CyberCard(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = AfaPanel),
             shape = RoundedCornerShape(18.dp)
@@ -496,10 +500,10 @@ private fun MetricCard(
     accent: Color,
     modifier: Modifier = Modifier
 ) {
-    androidx.compose.material3.Card(
+    CyberCard(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = AfaPanel),
-        shape = RoundedCornerShape(15.dp)
+        cornerRadius = 15.dp
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -513,7 +517,7 @@ private fun MetricCard(
 
 @androidx.compose.runtime.Composable
 private fun SectionPanel(title: String, subtitle: String, empty: String) {
-    androidx.compose.material3.Card(
+    CyberCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = AfaPanel),
         shape = RoundedCornerShape(18.dp)
