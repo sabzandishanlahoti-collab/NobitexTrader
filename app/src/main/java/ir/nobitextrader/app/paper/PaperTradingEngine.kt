@@ -51,7 +51,8 @@ data class PaperPortfolioValue(
     val positionsValue: Double,
     val unrealizedPnl: Double,
     val realizedPnl: Double,
-    val totalEquity: Double
+    val totalEquity: Double,
+    val unpricedPositionCount: Int
 )
 
 object PaperTradingEngine {
@@ -163,8 +164,13 @@ object PaperTradingEngine {
         validateFee(feeRate)
         var marketValue = 0.0
         var unrealized = 0.0
+        var unpriced = 0
         account.positions.values.forEach { position ->
-            val bid = bestBids[position.symbol] ?: return@forEach
+            val bid = bestBids[position.symbol]
+            if (bid == null) {
+                unpriced++
+                return@forEach
+            }
             validateMarketPrice(bid, "bestBid")
             val proceeds = position.quantity * bid
             marketValue += proceeds
@@ -175,7 +181,8 @@ object PaperTradingEngine {
             positionsValue = marketValue,
             unrealizedPnl = unrealized,
             realizedPnl = account.realizedPnl,
-            totalEquity = account.cash + marketValue
+            totalEquity = account.cash + marketValue,
+            unpricedPositionCount = unpriced
         )
     }
 
