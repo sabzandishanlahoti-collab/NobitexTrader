@@ -342,3 +342,18 @@ Do not wire RiskEngine or RiskLock to placeholder account values, public trade p
 - This is not yet proof that 443/443 symbols render correctly on-device. The end-to-end symbol display still requires APK/device verification.
 - START/STOP/KILL remain visibly disabled until authenticated account state, order lifecycle, cancellation and emergency-close behavior are implemented and tested. Do not fake live account metrics or execution.
 - Changes committed on `afa-mobile-dashboard-review`; PR #1 remains open and unmerged. CI run #349 for head `90af68c7a4ffa105b512eb025d01f058854f9b3c` was in progress at handoff update time; do not claim green until verified.
+
+
+## 14. User-requested personal paper-trading and bottom-navigation roadmap (2026-10-31)
+- User confirmed this is a personal/home trading app, not a commercial product, and explicitly wants visual polish comparable to the supplied terminal reference.
+- User described the previous unfinished app as supporting demo buy/sell without real funds, with bottom destinations for Settings, History, Whale, Bitcoin live candlestick chart, and one additional manual (non-automatic) buy/sell screen.
+- Current app audit: `AppScreen` currently has only HOME, SETTINGS, SCANNER. Dashboard has settings and scanner entry points but no persistent bottom navigation. Open Positions and Trade History are currently honest empty/read-only panels. BTC section currently displays a REST market snapshot (last/bid/ask/day range/change), not an OHLC candlestick chart. There is no manual paper-order screen or paper wallet/ledger yet. Whale tracking is not implemented.
+- Existing data foundation: `NobitexCandlesApi.fetchCandles(symbol,resolution,fromUnixSeconds,toUnixSeconds)` retrieves public OHLCV candles and validates them; `NobitexMarketApi.fetchMarketStats()` retrieves public BTC/IRT market snapshot. Candle API is read-only and does not execute trades.
+- Agreed implementation sequence:
+  1. Establish bottom navigation and distinct destinations: Dashboard, Scanner, BTC Chart, Manual Trade (Paper), History, Whale, Settings. Use compact terminal-style nav matching reference. Do not invent additional destinations; all named destinations must be reachable.
+  2. Implement a real BTC/IRT OHLC candlestick screen from NobitexCandlesApi data, with timeframe selection, loading/error/empty states, and explicit last-update/source labels. Do not label REST polling as WebSocket/live streaming.
+  3. Implement paper wallet and manual buy/sell flow using real fetched market prices but virtual balance only; persist cash, positions, fees, realized/unrealized P&L, order records and trade history locally; include validation, idempotent transaction IDs and deterministic unit tests. Must remain clearly marked PAPER / VIRTUAL and must never call private order endpoints.
+  4. Add whale view only when a verifiable public on-chain source and supported chain/asset coverage are established. Public exchange trades/order books cannot identify individual traders or whale identities; do not imply otherwise.
+  5. Add strategy-driven paper execution only after manual paper ledger is reliable; compare strategies with fees/slippage and walk-forward/backtest metrics. Binance profitability cannot be assumed to transfer to Nobitex/other exchanges.
+- No paper trading, BTC candlestick UI, whale tracker, or bottom navigation has been implemented by this roadmap note. These are planned, not completed.
+- Build run #351 succeeded for code SHA `0c4ed5eae71a1624c4ac53339a3d3921061a312f`; the documentation update itself will trigger a separate workflow and must be checked before claiming it green.
