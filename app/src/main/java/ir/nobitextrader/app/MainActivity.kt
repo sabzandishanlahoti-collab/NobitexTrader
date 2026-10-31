@@ -91,7 +91,7 @@ private fun AfaBrandHeader() {
         )
         Spacer(modifier = Modifier.width(5.dp))
         Text(
-            text = "NOBITEX. TRADER.AFA.ESNIPER",
+            text = "NOBITEX TRADER  A.F.A SNIPER",
             maxLines = 1,
             softWrap = false,
             fontSize = 14.sp,
@@ -195,6 +195,26 @@ private fun DashboardScreen(
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TransferMetricCard(
+                title = if (english) "DEPOSITS" else "واریزها",
+                value = "—",
+                caption = if (english) "Verified account records" else "سوابق تأییدشده حساب",
+                accent = AfaProfit,
+                modifier = Modifier.weight(1f)
+            )
+            TransferMetricCard(
+                title = if (english) "WITHDRAWALS" else "برداشت‌ها",
+                value = "—",
+                caption = if (english) "Verified account records" else "سوابق تأییدشده حساب",
+                accent = AfaCyan,
+                modifier = Modifier.weight(1f)
+            )
         }
 
         androidx.compose.material3.Card(
@@ -507,6 +527,47 @@ private fun MetricCard(
         ) {
             Text(title, color = AfaMuted, fontSize = 10.sp, maxLines = 1)
             Text(value, color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 23.sp)
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun TransferMetricCard(
+    title: String,
+    value: String,
+    caption: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = AfaPanel),
+        shape = RoundedCornerShape(15.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                title,
+                color = accent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Text(
+                value,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 21.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Text(
+                caption,
+                color = AfaMuted,
+                fontSize = 9.sp
+            )
         }
     }
 }
