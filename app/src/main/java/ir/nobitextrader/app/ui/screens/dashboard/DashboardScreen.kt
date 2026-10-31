@@ -3,22 +3,27 @@ package ir.nobitextrader.app.ui.screens.dashboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import ir.nobitextrader.app.ui.components.CyberCard
 import ir.nobitextrader.app.ui.components.CyberTokens
 import ir.nobitextrader.app.ui.screens.dashboard.components.*
 
 @Composable
 fun DashboardScreen(
     isConnected: Boolean,
-    batteryLevel: Int,
+    batteryLevel: Int?,
     onSettingsClick: () -> Unit,
     tickers: List<TickerData>,
     initialCapital: String,
     capitalInUse: String,
     netProfit: String,
-    isProfitPositive: Boolean,
+    isProfitPositive: Boolean?,
     depositWithdraw: String,
     totalTrades: String,
     isBotRunning: Boolean,
@@ -35,6 +40,11 @@ fun DashboardScreen(
     todayBuysVolume: String,
     todaySellsCount: String,
     todaySellsVolume: String,
+    onScannerClick: () -> Unit = {},
+    onScanMarketsClick: () -> Unit = {},
+    isScanning: Boolean = false,
+    scanProgressText: String? = null,
+    engineControlsEnabled: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -46,6 +56,7 @@ fun DashboardScreen(
         item(key = "dashboard_header") {
             DashboardHeader(
                 isConnected = isConnected,
+                isApiHealthy = false,
                 batteryLevel = batteryLevel,
                 onSettingsClick = onSettingsClick
             )
@@ -54,6 +65,51 @@ fun DashboardScreen(
         item(key = "market_ticker") {
             MarketTicker(tickers = tickers)
             Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        item(key = "market_scanner_access") {
+            CyberCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                borderColor = CyberTokens.NeonTurquoise.copy(alpha = 0.25f)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "رادار بازار نوبیتکس",
+                        color = CyberTokens.TextPrimary,
+                        fontSize = 14.sp
+                    )
+                    scanProgressText?.let {
+                        Text(
+                            text = it,
+                            color = CyberTokens.TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onScanMarketsClick,
+                            enabled = !isScanning,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (isScanning) "در حال اسکن…" else "اسکن همه نمادها")
+                        }
+                        OutlinedButton(
+                            onClick = onScannerClick,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("صفحه اسکنر")
+                        }
+                    }
+                }
+            }
         }
 
         item(key = "top_kpis") {
@@ -74,7 +130,8 @@ fun DashboardScreen(
                 onStartClick = onStartClick,
                 onStopClick = onStopClick,
                 onKillClick = onKillClick,
-                onAutoTradeToggle = onAutoTradeToggle
+                onAutoTradeToggle = onAutoTradeToggle,
+                controlsEnabled = engineControlsEnabled
             )
         }
 
