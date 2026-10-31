@@ -879,11 +879,7 @@ class MainActivity : ComponentActivity() {
                                 }
                                 AppScreen.BTC_CHART -> BtcChartScreen(english = english)
                                 AppScreen.PAPER_TRADE -> PaperTradeScreen(english = english, market = marketResult)
-                                AppScreen.HISTORY -> SectionPanel(
-                                    title = if (english) "TRADE HISTORY" else "تاریخچه معاملات",
-                                    subtitle = if (english) "PAPER AND VERIFIED EXECUTIONS" else "معاملات مجازی و اجراهای تأییدشده",
-                                    empty = if (english) "No persisted paper-trade ledger is available yet." else "هنوز دفتر معاملات مجازی ذخیره‌شده‌ای وجود ندارد."
-                                )
+                                AppScreen.HISTORY -> PaperHistoryScreen(english = english)
                                 AppScreen.WHALE -> SectionPanel(
                                     title = if (english) "WHALE TRACKER" else "ردیاب نهنگ",
                                     subtitle = if (english) "PUBLIC ON-CHAIN DATA ONLY" else "فقط داده عمومی روی زنجیره",
