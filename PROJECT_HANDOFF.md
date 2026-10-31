@@ -162,3 +162,75 @@ This is a source-level inventory, not a claim of production readiness. The lates
 ### Verified build checkpoint after the audit-document commit
 - Commit: to be filled after this documentation commit is created and its exact-SHA Actions run succeeds.
 - Workflow status: pending verification.
+
+
+## 9. Scanner-to-strategy and backtest audit — source review (2026-10-31)
+
+This section records a source-level review of the complete scanner/strategy path on branch `afa-mobile-dashboard-review`. It is not a live Nobitex integration test or a profitability assessment.
+
+### Actual call path and user interaction
+- `MarketScannerScreen` invokes `MarketScannerViewModel.analyzeMarket(symbol)` from an explicit per-market button. A normal scan does **not** automatically run candle strategies for every market.
+- `analyzeMarket` normalizes the symbol, suppresses a duplicate active request for that symbol, creates a 48-hour window of 15-minute candles, and calls `StrategyAnalysisCoordinator.analyze`.
+- The coordinator fetches candles using `NobitexCandlesApi`, passes the same candle list to the registered strategies through `StrategyOrchestrator`, then passes the batch to `StrategyDecisionEngine`.
+- The result is held in the ViewModel's in-memory `analysisBySymbol` map and displayed in the scanner card. It is not a persisted trade or order.
+- The scan and candle-analysis paths are separate. Scan results are based on order-book snapshots; strategy results are based on a later, independent candle request. There is no source-level guarantee that both snapshots represent the same market instant.
+
+### Candle request and validation
+- Default analysis request: resolution `15`, lookback `48` hours. The window helper ends at the opening timestamp of the last fully closed 15-minute candle, avoiding an intentionally open current candle.
+- The candle parser validates response status, array presence/length, numeric values, OHLC relationships, non-negative volume, and timestamp conversion from Unix seconds to milliseconds. It sorts returned candles chronologically.
+- The parser does not reject duplicate timestamps; duplicates become non-strict chronology and are rejected later by the orchestrator. It also does not validate expected 15-minute spacing, missing intervals, response freshness against the requested end, or a minimum complete candle count at the API boundary.
+- The coordinator does not independently reject a stale but otherwise valid candle series. Empty/short data is generally converted by individual strategies into insufficient-data signals, not a transport failure.
+- **Follow-up required:** add explicit candle-series integrity/freshness validation (duplicates, interval gaps, last-closed-candle age, and minimum usable history) with deterministic tests before treating signals as dependable. Confirm exact Nobitex UDF timestamp and `to` boundary semantics against current official documentation/live fixtures first.
+
+### Strategy inventory and semantics
+The default coordinator registers five candle-only strategies, in this order:
+1. `FmcStrategy`: latest candle body momentum plus volume relative to the preceding 10 candles; default minimum body 0.15%, volume ratio 1.5, stop 0.50%, reward/risk 2.0.
+2. `FvgStrategy`: three-candle outer-wick gap; default minimum gap 0.05%, reward/risk 2.0.
+3. `LiquiditySweepStrategy`: latest candle sweeps a prior 10-candle extreme and closes back across it; default minimum sweep 0.02%, reward/risk 2.0.
+4. `OrderBlockStrategy`: identifies a recent opposite candle before a displacement candle and requires a later retest/rejection; default lookback 12, displacement 0.20%, body/range 0.60, reward/risk 2.0.
+5. `ScaliperStrategy`: EMA(5)/EMA(13), one-candle momentum and relative volume; default momentum 0.05%, volume ratio 1.20, stop 0.30%, reward/risk 1.50.
+- The 48-hour/15-minute request yields a theoretical window of about 192 intervals plus boundary behavior; it is not proof that the API returns a complete contiguous series.
+- Confidence values are bounded heuristic setup-strength scores, not calibrated probabilities of profit. Several strategies explicitly document this; UI/marketing must preserve that distinction.
+- Strategy implementations emit signals only. Their stop/target values are analysis outputs, not approved exchange orders.
+- `WhalePressureStrategy` is not registered by default. It requires externally supplied trades with known aggressor direction; the public trades summary currently used by the scanner does not establish that aggressor field. Excluding it is correct; do not connect it by guessing aggressor from candle color or public BUY/SELL labels until the endpoint semantics are verified.
+- Strategy IDs `APEX_SNIPER` and `KALMAN_TREND` exist in the enum but are not part of the default coordinator registration. Do not represent them as active strategies.
+
+### Decision boundary
+- The default decision engine requires two agreeing confirmed LONG or SHORT signals; one signal alone is FLAT/no-trade, and simultaneous confirmed long and short signals are rejected.
+- The engine validates batch counters, duplicate IDs, symbols, and confidence ranges.
+- A strategy execution failure does not automatically invalidate an otherwise two-signal agreement; an existing test explicitly expects an actionable decision when two strategies agree and a third fails. This is a policy choice that should be documented in UI output (e.g. show expected/attempted/failed counts) before any execution layer is considered.
+- The word `isActionable` means strategy consensus only. It is not a risk approval. No account-aware RiskEngine call or order submission is part of this analysis path.
+
+### Backtest boundaries and issue found
+- `BacktestEngine` is deterministic research-only OHLC simulation. It calls the supplied signal callback using candles through a completed close and enters at the next candle open; stop wins if stop and target are both touched in one candle; fees and configured slippage are included.
+- It uses a fixed notional per position, one position at a time, and has no exchange adapter, account risk gate, partial fills, order-book spread/impact model, funding/borrow costs, exchange lot/minimum constraints, or persistent trade history integration.
+- **Potential correctness defect requiring a focused fix and regression tests:** when the next candle opens already beyond the pending signal's take-profit (LONG opens at/above target; SHORT opens at/below target), the engine currently enters at that open and then records an immediate take-profit at the old target. That can produce an impossible/incorrect fill (including a loss despite a take-profit exit). A gap through the stop is also currently modeled as entering at an open already beyond the stop and immediately stopping out. The existing gap-through-stop test codifies that behavior. Before using backtest metrics, define a consistent policy for gap-at-entry (normally skip/cancel the stale signal if the next open has already crossed either bracket boundary, or otherwise model the exact executable order semantics) and update both long/short tests.
+- Backtest results must not be presented as proof of profitability. The current tests cover many accounting/edge cases but do not establish realistic exchange fills or out-of-sample performance.
+
+### Test coverage observed
+- Unit tests exist for candle parsing, analysis-window arithmetic, ViewModel request/cancellation behavior, strategy orchestration, decision consensus, each default strategy, WhalePressureStrategy in isolation, and backtest accounting.
+- Tests are deterministic/local; they do not prove current endpoint availability, live symbol coverage, timestamp boundary semantics, API rate limits, or production behavior.
+- The workflow currently runs unit tests and assembles a Debug APK; no live exchange contract test or signed Release build is part of that workflow.
+
+### Consolidated next actions (do not mix with visual work)
+1. Verify current Nobitex UDF candle contract and order-book/trades endpoint semantics from official docs and controlled live fixtures.
+2. Add a shared candle-series validator and tests for duplicate timestamps, interval gaps, stale last candle, empty/short history, and boundary inclusivity.
+3. Fix and test backtest gap-at-entry behavior for both LONG and SHORT before relying on its metrics.
+4. Decide and expose partial-strategy-failure policy; display strategy counts/failures and clarify heuristic confidence.
+5. Only after those checks, consider scanner-to-analysis batch integration or risk-gated paper execution. Keep all order execution out of scope until authorized account integration and an independently tested risk gate exist.
+
+### Status matrix from this audit
+| Capability | Status | Evidence / limitation |
+|---|---|---|
+| Public order-book market scan | Implemented, build/test verified | Single-symbol and all-market API parsers, scanner, filters, ranking and unit tests; live API coverage/rate behavior not verified here |
+| Public recent-trade flow summary | Implemented, build/test verified | Public trade adapter and freshness-limited ranking; does not identify accounts or prove aggressor identity |
+| Manual per-symbol 15m strategy analysis | Implemented, build/test verified | UI button → ViewModel → candle API → five strategies → consensus decision; live candle contract/freshness not integration verified |
+| Automatic strategy analysis for all scanned markets | Not started | Scan does not call the analysis coordinator for each result |
+| Whale-pressure integration | Not started | Strategy isolated; no verified aggressor-aware feed connected |
+| Backtest research engine | Implemented, build/test verified | Deterministic OHLC engine and tests; gap-at-entry correctness issue remains; no profitability claim |
+| Risk-gated paper/live order pipeline | Not started / not verified | No verified call path from decision to RiskEngine and exchange order API |
+| Signed Release APK / GitHub Release | Not started | Current workflow produces Debug build artifact only |
+
+### Verified documentation checkpoint
+- This audit report is committed on the active branch only.
+- Commit and exact-SHA Actions result: fill after the documentation update's workflow completes successfully.
