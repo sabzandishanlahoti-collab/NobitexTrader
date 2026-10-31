@@ -17,7 +17,8 @@ class PaperAutoTradingPolicyTest {
         spreadPercent = 2.02,
         bidLiquidityTop5 = 100000.0,
         askLiquidityTop5 = 100000.0,
-        success = true
+        success = true,
+        observedAtMillis = 100_000L
     )
 
     private val portfolio = PaperPortfolio(
@@ -43,11 +44,10 @@ class PaperAutoTradingPolicyTest {
         snapshot: MarketScanResult = market,
         fee: Double = 0.001,
         budget: Double = 10_000.0,
-        observedAt: Long = 100_000L,
         now: Long = 101_000L
     ) = PaperAutoTradingPolicy.plan(
         decision(direction), snapshot, portfolio, fee, budget,
-        observedAt, now, maxSpreadPercent = 3.0
+        now, maxSpreadPercent = 3.0
     )
 
     @Test fun longUsesBestAskAndStaysWithinBudget() {
@@ -69,7 +69,7 @@ class PaperAutoTradingPolicyTest {
     }
 
     @Test fun rejectsStaleMarketData() {
-        val result = plan(observedAt = 1L, now = 20_000L)
+        val result = plan(snapshot = market.copy(observedAtMillis = 1L), now = 20_000L)
         assertTrue(result is PaperAutoTradePlan.Rejected)
         assertTrue((result as PaperAutoTradePlan.Rejected).reason.contains("stale"))
     }
@@ -84,7 +84,7 @@ class PaperAutoTradingPolicyTest {
         val empty = portfolio.copy(positions = emptyList())
         val result = PaperAutoTradingPolicy.plan(
             decision(TradeDirection.SHORT), market.copy(spreadPercent = 0.5),
-            empty, 0.001, 10_000.0, 100_000L, 101_000L
+            empty, 0.001, 10_000.0, 101_000L
         )
         assertTrue(result is PaperAutoTradePlan.Rejected)
         assertTrue((result as PaperAutoTradePlan.Rejected).reason.contains("No virtual position"))
