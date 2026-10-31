@@ -154,7 +154,7 @@ internal fun PaperTradeScreen(
                     try {
                         val p = price?.takeIf { priceIsFresh } ?: error("Market price is stale or unavailable")
                         portfolio = PaperTradingStore.execute(
-                            context, "BUY", "BTCIRT", quantityText.trim().toDouble(), p, feeRatePercent
+                            context, "BUY", "BTCIRT", quantityText.trim().toDouble(), p, feeRatePercent / 100.0
                         )
                         message = if (english) "Virtual buy recorded." else "خرید مجازی ثبت شد."
                     } catch (e: Exception) {
@@ -169,7 +169,7 @@ internal fun PaperTradeScreen(
                     try {
                         val p = price?.takeIf { priceIsFresh } ?: error("Market price is stale or unavailable")
                         portfolio = PaperTradingStore.execute(
-                            context, "SELL", "BTCIRT", quantityText.trim().toDouble(), p, feeRatePercent
+                            context, "SELL", "BTCIRT", quantityText.trim().toDouble(), p, feeRatePercent / 100.0
                         )
                         message = if (english) "Virtual sell recorded." else "فروش مجازی ثبت شد."
                     } catch (e: Exception) {
@@ -177,7 +177,7 @@ internal fun PaperTradeScreen(
                     }
                 },
                 modifier = Modifier.weight(1f),
-                enabled = priceIsFresh
+                enabled = paperTradeEnabled
             ) { Text(if (english) "SELL • PAPER" else "فروش مجازی") }
         }
         message?.let {
