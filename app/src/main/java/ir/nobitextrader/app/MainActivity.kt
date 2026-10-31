@@ -78,10 +78,10 @@ private fun AfaBrandHeader() {
             fontFamily = FontFamily.Cursive,
             fontStyle = FontStyle.Italic,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF35DDE0),
+            color = MaterialTheme.colorScheme.primary,
             style = TextStyle(
                 shadow = Shadow(
-                    color = Color(0xFF00DDE8).copy(alpha = 0.85f),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
                     offset = Offset.Zero,
                     blurRadius = 18f
                 )
@@ -95,10 +95,10 @@ private fun AfaBrandHeader() {
             fontSize = 14.sp,
             letterSpacing = (-0.45).sp,
             fontWeight = FontWeight.ExtraBold,
-            color = Color(0xFFEAFBFC),
+            color = MaterialTheme.colorScheme.onSurface,
             style = TextStyle(
                 shadow = Shadow(
-                    color = Color(0xFF35DDE0).copy(alpha = 0.55f),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
                     offset = Offset.Zero,
                     blurRadius = 9f
                 )
@@ -108,11 +108,6 @@ private fun AfaBrandHeader() {
 }
 
 
-private val AfaCyan = Color(0xFF35DDE0)
-private val AfaPanel = Color(0xFF101B2B)
-private val AfaMuted = Color(0xFFA9C2CC)
-private val AfaProfit = Color(0xFF35D6B0)
-private val AfaLoss = Color(0xFFFF647C)
 
 @androidx.compose.runtime.Composable
 private fun DashboardScreen(
@@ -148,7 +143,7 @@ private fun DashboardScreen(
                 )
                 Text(
                     if (english) "NOBITEX • AFA ESNIPER" else "نوبیتکس • آفا اسنایپر",
-                    color = AfaMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
             }
@@ -161,7 +156,7 @@ private fun DashboardScreen(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 if (english) "ACCOUNT OVERVIEW" else "نمای کلی سرمایه",
-                color = AfaCyan,
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -169,13 +164,13 @@ private fun DashboardScreen(
                 MetricCard(
                     title = if (english) "INITIAL CAPITAL" else "سرمایه اولیه",
                     value = "—",
-                    accent = AfaCyan,
+                    accent = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
                     title = if (english) "IN POSITIONS" else "سرمایه در گردش",
                     value = "—",
-                    accent = AfaCyan,
+                    accent = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -183,13 +178,13 @@ private fun DashboardScreen(
                 MetricCard(
                     title = if (english) "NET PROFIT" else "سود خالص",
                     value = "—",
-                    accent = AfaProfit,
+                    accent = AfaColorSchemes.profit,
                     modifier = Modifier.weight(1f)
                 )
                 MetricCard(
                     title = if (english) "NET LOSS" else "ضرر خالص",
                     value = "—",
-                    accent = AfaLoss,
+                    accent = AfaColorSchemes.loss,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -203,21 +198,21 @@ private fun DashboardScreen(
                 title = if (english) "DEPOSITS" else "واریزها",
                 value = "—",
                 caption = if (english) "Verified account records" else "سوابق تأییدشده حساب",
-                accent = AfaProfit,
+                accent = AfaColorSchemes.profit,
                 modifier = Modifier.weight(1f)
             )
             TransferMetricCard(
                 title = if (english) "WITHDRAWALS" else "برداشت‌ها",
                 value = "—",
                 caption = if (english) "Verified account records" else "سوابق تأییدشده حساب",
-                accent = AfaCyan,
+                accent = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f)
             )
         }
 
         androidx.compose.material3.Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AfaPanel),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(18.dp)
         ) {
             Column(
@@ -231,13 +226,13 @@ private fun DashboardScreen(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     androidx.compose.material3.Surface(
-                        color = Color(0xFF4B3B20),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
                         shape = RoundedCornerShape(50)
                     ) {
                         Text(
                             if (english) "NOT CONNECTED" else "اتصال اجرا برقرار نیست",
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            color = Color(0xFFFFD18A),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -245,7 +240,7 @@ private fun DashboardScreen(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         if (english) "Order execution is not enabled" else "ثبت سفارش هنوز فعال نشده است",
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                 }
@@ -262,7 +257,7 @@ private fun DashboardScreen(
                 }
                 Text(
                     if (english) "Controls unlock only after verified private API, order state and emergency-close tests." else "این کلیدها پس از تکمیل و آزمایش API خصوصی، وضعیت سفارش‌ها و توقف اضطراری فعال می‌شوند.",
-                    color = AfaMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp
                 )
             }
@@ -270,7 +265,7 @@ private fun DashboardScreen(
 
         androidx.compose.material3.Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AfaPanel),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(18.dp)
         ) {
             Column(
@@ -290,11 +285,11 @@ private fun DashboardScreen(
                         )
                         Text(
                             if (english) "Independent full-screen scanner" else "اسکنر مستقل در صفحه تمام‌صفحه",
-                            color = AfaMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 10.sp
                         )
                     }
-                    Text("◎", color = AfaCyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    Text("◎", color = MaterialTheme.colorScheme.primary, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
@@ -328,7 +323,7 @@ private fun DashboardScreen(
                         } else {
                             "پیشرفت: ${scannerState.completedCount} / ${scannerState.totalCount}"
                         },
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                 }
@@ -341,7 +336,7 @@ private fun DashboardScreen(
                         } else {
                             "دفتر سفارش معتبر: $successful   •   ناموفق: $failed"
                         },
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                     scannerState.results
@@ -355,21 +350,21 @@ private fun DashboardScreen(
                             ) {
                                 Text(
                                     result.symbol,
-                                    color = AfaCyan,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
                                     (if (english) "Spread " else "اختلاف ") +
                                         String.format(Locale.US, "%.3f%%", result.spreadPercent),
-                                    color = AfaMuted,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 11.sp
                                 )
                             }
                         }
                 }
                 scannerState.errorMessage?.let { message ->
-                    Text(message, color = AfaLoss, fontSize = 11.sp)
+                    Text(message, color = AfaColorSchemes.loss, fontSize = 11.sp)
                 }
                 val analyzedMarkets = scannerState.analysisBySymbol.entries
                     .filter { it.value.result != null || it.value.error != null || it.value.isLoading }
@@ -378,7 +373,7 @@ private fun DashboardScreen(
                     HorizontalDivider(color = Color(0xFF29404E))
                     Text(
                         if (english) "STRATEGY ANALYSIS" else "خلاصه تحلیل استراتژی",
-                        color = AfaCyan,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp
                     )
@@ -391,9 +386,9 @@ private fun DashboardScreen(
                             else -> if (english) "NO TRADE" else "بدون معامله"
                         }
                         val statusColor = when {
-                            analysisState.isLoading -> AfaMuted
-                            analysisState.error != null -> AfaLoss
-                            decision?.isActionable == true -> AfaProfit
+                            analysisState.isLoading -> MaterialTheme.colorScheme.onSurfaceVariant
+                            analysisState.error != null -> AfaColorSchemes.loss
+                            decision?.isActionable == true -> AfaColorSchemes.profit
                             else -> Color(0xFFFFC66D)
                         }
                         Row(
@@ -402,7 +397,7 @@ private fun DashboardScreen(
                         ) {
                             Text(
                                 symbol,
-                                color = AfaCyan,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -419,14 +414,14 @@ private fun DashboardScreen(
                                     decision.agreeingStrategyIds.size +
                                     " • " +
                                     String.format(Locale.US, "%.1f%%", decision.confidence * 100.0),
-                                color = AfaMuted,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 9.sp
                             )
                         }
                     }
                     Text(
                         if (english) "Analysis signals only — no order has been placed." else "این‌ها فقط خروجی تحلیل هستند؛ هیچ سفارشی ثبت نشده است.",
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 9.sp
                     )
                 }
@@ -435,7 +430,7 @@ private fun DashboardScreen(
 
         androidx.compose.material3.Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = AfaPanel),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             shape = RoundedCornerShape(18.dp)
         ) {
             Column(
@@ -459,11 +454,11 @@ private fun DashboardScreen(
                 if (marketResult == null) {
                     Text(
                         if (english) "No market snapshot loaded yet." else "هنوز اطلاعاتی از بازار دریافت نشده است.",
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 } else {
-                    Text("BTC / IRT  •  ${marketResult.market}", color = AfaCyan, fontWeight = FontWeight.Bold)
+                    Text("BTC / IRT  •  ${marketResult.market}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     Text(
                         (if (english) "Last: " else "آخرین قیمت: ") + marketResult.latest,
                         color = MaterialTheme.colorScheme.onSurface
@@ -471,17 +466,17 @@ private fun DashboardScreen(
                     Text(
                         (if (english) "Best bid: " else "بهترین خرید: ") + marketResult.bestBuy +
                             "     " + (if (english) "Best ask: " else "بهترین فروش: ") + marketResult.bestSell,
-                        color = AfaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                     Text(
                         (if (english) "24h change: " else "تغییر روزانه: ") + marketResult.dayChange + "%",
-                        color = if (marketResult.dayChange >= 0.0) AfaProfit else AfaLoss,
+                        color = if (marketResult.dayChange >= 0.0) AfaColorSchemes.profit else AfaColorSchemes.loss,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 marketError?.let {
-                    Text(it, color = AfaLoss, fontSize = 11.sp)
+                    Text(it, color = AfaColorSchemes.loss, fontSize = 11.sp)
                 }
             }
         }
@@ -501,7 +496,7 @@ private fun DashboardScreen(
         }
         Text(
             if (english) "Account balance, profit and trade history require verified authenticated exchange data." else "موجودی حساب، سود و تاریخچه معاملات به داده احراز هویت‌شده و تأییدشده صرافی نیاز دارند.",
-            color = AfaMuted,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 10.sp
         )
     }
@@ -516,14 +511,14 @@ private fun MetricCard(
 ) {
     androidx.compose.material3.Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = AfaPanel),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(15.dp)
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Text(title, color = AfaMuted, fontSize = 10.sp, maxLines = 1)
+            Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, maxLines = 1)
             Text(value, color = accent, fontWeight = FontWeight.ExtraBold, fontSize = 23.sp)
         }
     }
@@ -539,7 +534,7 @@ private fun TransferMetricCard(
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = AfaPanel),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(15.dp)
     ) {
         Column(
@@ -563,7 +558,7 @@ private fun TransferMetricCard(
             )
             Text(
                 caption,
-                color = AfaMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 9.sp
             )
         }
@@ -574,7 +569,7 @@ private fun TransferMetricCard(
 private fun SectionPanel(title: String, subtitle: String, empty: String) {
     androidx.compose.material3.Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = AfaPanel),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(18.dp)
     ) {
         Column(
@@ -582,9 +577,9 @@ private fun SectionPanel(title: String, subtitle: String, empty: String) {
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = AfaCyan, fontSize = 9.sp)
+            Text(subtitle, color = MaterialTheme.colorScheme.primary, fontSize = 9.sp)
             HorizontalDivider(color = Color(0xFF29404E))
-            Text(empty, color = AfaMuted, fontSize = 11.sp)
+            Text(empty, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         }
     }
 }
