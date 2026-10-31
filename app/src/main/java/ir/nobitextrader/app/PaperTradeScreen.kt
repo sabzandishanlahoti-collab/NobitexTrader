@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -27,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.nobitextrader.app.data.MarketStats
+import ir.nobitextrader.app.scanner.MarketScanResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -40,11 +42,13 @@ internal fun PaperTradeScreen(
     english: Boolean,
     market: MarketStats?,
     marketUpdatedAt: Long?,
+    scannerResults: List<MarketScanResult>,
     feeRatePercent: Double
 ) {
     val context = LocalContext.current
     var portfolio by remember { mutableStateOf(PaperTradingStore.load(context)) }
     var quantityText by remember { mutableStateOf("0.001") }
+    var selectedSymbol by remember { mutableStateOf("BTCIRT") }
     var message by remember { mutableStateOf<String?>(null) }
     var autoRunning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -57,24 +61,46 @@ internal fun PaperTradeScreen(
         }
     }
 
-    val price = market?.latest?.takeIf { it.isFinite() && it > 0.0 }
-    val priceAgeMs = marketUpdatedAt?.let { (nowMillis - it).coerceAtLeast(0L) }
-    val priceIsFresh = price != null && priceAgeMs != null &&
-        priceAgeMs <= PAPER_PRICE_MAX_AGE_MS
+    val freshMarketPrices = scannerResults.asSequence()
+        .filter { it.success && it.lastPrice.isFinite() && it.lastPrice > 0.0 && it.observedAtMillis > 0L }
+        .filter { nowMillis - it.observedAtMillis in 0L..120_000L }
+        .associate { it.symbol to it.lastPrice }
+    val freshBtcPrice = market?.latest?.takeIf {
+        it.isFinite() && it > 0.0 && marketUpdatedAt != null &&
+            nowMillis - marketUpdatedAt in 0L..PAPER_PRICE_MAX_AGE_MS
+    }
+    val currentPrice = if (selectedSymbol == "BTCIRT") freshBtcPrice ?: freshMarketPrices[selectedSymbol]
+        else freshMarketPrices[selectedSymbol]
+    val priceAgeMs = if (selectedSymbol == "BTCIRT" && freshBtcPrice != null) {
+        marketUpdatedAt?.let { (nowMillis - it).coerceAtLeast(0L) }
+    } else {
+        scannerResults.firstOrNull { it.symbol == selectedSymbol }?.observedAtMillis
+            ?.let { (nowMillis - it).coerceAtLeast(0L) }
+    }
+    val priceIsFresh = currentPrice != null && priceAgeMs != null && priceAgeMs <= 120_000L
     val feeIsConfigured = feeRatePercent.isFinite() && feeRatePercent > 0.0 && feeRatePercent <= 2.0
     val paperTradeEnabled = priceIsFresh && feeIsConfigured
-    val btcQty = portfolio.quantity("BTCIRT")
-    val positionMarketValue = if (priceIsFresh) price!! * btcQty else null
+    val selectedQuantity = portfolio.quantity(selectedSymbol)
+    val positionMarks = portfolio.positions.map { position ->
+        val mark = if (position.symbol == "BTCIRT") freshBtcPrice ?: freshMarketPrices[position.symbol]
+            else freshMarketPrices[position.symbol]
+        position to mark
+    }
+    val allPositionsMarked = positionMarks.all { it.second != null }
+    val positionMarketValue = if (allPositionsMarked) {
+        positionMarks.sumOf { (position, mark) -> position.quantity * mark!! }
+    } else null
     val totalEquity = positionMarketValue?.let { portfolio.cash + it }
-    val unrealized = if (priceIsFresh && feeIsConfigured) {
-        val gross = (price!! - portfolio.averageEntry("BTCIRT")) * btcQty
-        val estimatedExitFee = price * btcQty * feeRatePercent / 100.0
-        gross - estimatedExitFee
+    val unrealized = if (allPositionsMarked && feeIsConfigured) {
+        positionMarks.sumOf { (position, mark) ->
+            val value = position.quantity * mark!!
+            (mark - position.averageEntry) * position.quantity - value * feeRatePercent / 100.0
+        }
     } else null
     val priceText = when {
-        price == null -> if (english) "Unavailable" else "در دسترس نیست"
+        currentPrice == null -> if (english) "Unavailable" else "در دسترس نیست"
         !priceIsFresh -> if (english) "STALE — trading disabled" else "کهنه — معامله غیرفعال"
-        else -> String.format(Locale.US, "%,.0f IRR", price)
+        else -> String.format(Locale.US, "%,.0f IRR", currentPrice)
     }
 
     Column(
@@ -82,6 +108,16 @@ internal fun PaperTradeScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text("MANUAL PAPER TRADE", color = MaterialTheme.colorScheme.primary, fontSize = 18.sp)
+        Text(if (english) "SELECT A SCANNED MARKET" else "انتخاب نماد از بازارهای اسکن‌شده", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(scannerResults.filter { it.success && it.lastPrice.isFinite() && it.lastPrice > 0.0 }) { item ->
+                OutlinedButton(onClick = { selectedSymbol = item.symbol; message = null }) {
+                    Text(item.symbol + if (item.symbol == selectedSymbol) " ✓" else "")
+                }
+            }
+        }
+        Text((if (english) "SELECTED: " else "نماد انتخاب‌شده: ") + selectedSymbol,
+            color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
         Text(
             if (english) "VIRTUAL WALLET • PUBLIC NOBITEX PRICE • NO REAL ORDERS"
             else "کیف پول مجازی • قیمت عمومی نوبیتکس • بدون سفارش واقعی",
@@ -230,16 +266,16 @@ internal fun PaperTradeScreen(
             value = quantityText,
             onValueChange = { quantityText = it; message = null },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(if (english) "BTC quantity" else "مقدار BTC") },
+            label = { Text((if (english) "Quantity of " else "مقدار ") + selectedSymbol) },
             singleLine = true
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = {
                     try {
-                        val p = price?.takeIf { priceIsFresh } ?: error("Market price is stale or unavailable")
+                        val p = currentPrice?.takeIf { priceIsFresh } ?: error("Market price is stale or unavailable")
                         portfolio = PaperTradingStore.execute(
-                            context, "BUY", "BTCIRT", quantityText.trim().toDouble(), p, feeRatePercent / 100.0
+                            context, "BUY", selectedSymbol, quantityText.trim().toDouble(), p, feeRatePercent / 100.0
                         )
                         message = if (english) "Virtual buy recorded." else "خرید مجازی ثبت شد."
                     } catch (e: Exception) {
@@ -252,9 +288,9 @@ internal fun PaperTradeScreen(
             OutlinedButton(
                 onClick = {
                     try {
-                        val p = price?.takeIf { priceIsFresh } ?: error("Market price is stale or unavailable")
+                        val p = currentPrice?.takeIf { priceIsFresh } ?: error("Market price is stale or unavailable")
                         portfolio = PaperTradingStore.execute(
-                            context, "SELL", "BTCIRT", quantityText.trim().toDouble(), p, feeRatePercent / 100.0
+                            context, "SELL", selectedSymbol, quantityText.trim().toDouble(), p, feeRatePercent / 100.0
                         )
                         message = if (english) "Virtual sell recorded." else "فروش مجازی ثبت شد."
                     } catch (e: Exception) {
@@ -341,7 +377,7 @@ internal fun PaperTradeScreen(
                             Text(trade.side,
                                 color = if (trade.side == "BUY") AfaColorSchemes.profit else AfaColorSchemes.loss,
                                 fontSize = 11.sp)
-                            Text(String.format(Locale.US, "%.8f BTC", trade.quantity),
+                            Text(String.format(Locale.US, "%.8f %s", trade.quantity, trade.symbol),
                                 color = MaterialTheme.colorScheme.onSurface, fontSize = 10.sp)
                             Text(SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
                                 .format(Date(trade.timestamp)),
