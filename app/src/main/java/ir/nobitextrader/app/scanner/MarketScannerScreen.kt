@@ -660,9 +660,39 @@ private fun MarketResultCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    DataValue("عمق خرید ۵ سطح", formatNumber(result.bidLiquidityTop5))
-                    DataValue("عمق فروش ۵ سطح", formatNumber(result.askLiquidityTop5))
+                    DataValue("عمق خرید ۵ سطح", formatQuoteLiquidity(result.bidLiquidityTop5))
+                    DataValue("عمق فروش ۵ سطح", formatQuoteLiquidity(result.askLiquidityTop5))
                 }
+                val combinedDepth = result.bidLiquidityTop5 + result.askLiquidityTop5
+                val bidDepthShare = if (combinedDepth > 0.0) {
+                    result.bidLiquidityTop5 / combinedDepth * 100.0
+                } else {
+                    Double.NaN
+                }
+                val depthImbalance = result.bidLiquidityTop5 - result.askLiquidityTop5
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(TerminalPanelAlt, RoundedCornerShape(9.dp))
+                        .padding(horizontal = 9.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    DataValue(
+                        "سهم عمق خرید",
+                        bidDepthShare.takeIf { it.isFinite() }
+                            ?.let { String.format(Locale.US, "%.1f%%", it) } ?: "—"
+                    )
+                    DataValue(
+                        "برتری عمق",
+                        (if (depthImbalance >= 0.0) "+" else "−") +
+                            formatQuoteLiquidity(kotlin.math.abs(depthImbalance))
+                    )
+                }
+                Text(
+                    "سهم عمق خرید از مجموع ۱۰ سطح برتر دفتر سفارش؛ شاخص فشار سفارش است، نه پیش‌بینی قطعی قیمت.",
+                    color = TerminalMuted,
+                    fontSize = 9.sp
+                )
 
                 OutlinedButton(
                     onClick = onLoadTradeFlow,
