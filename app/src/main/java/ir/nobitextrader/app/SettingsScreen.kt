@@ -47,7 +47,13 @@ data class TraderSettings(
     val requestTimeoutSeconds: Int = 10,
     val maxMarketsPerBatch: Int = 10,
     val maxSpreadPercent: Float = 1f,
-    val paperFeePercent: Float = 0f
+    val paperFeePercent: Float = 0f,
+    val strategyFmcEnabled: Boolean = true,
+    val strategyFvgEnabled: Boolean = true,
+    val strategyLiquiditySweepEnabled: Boolean = true,
+    val strategyOrderBlockEnabled: Boolean = true,
+    val strategyMicroScalperEnabled: Boolean = true,
+    val minimumStrategyAgreement: Int = 2
 )
 
 object TraderSettingsStore {
@@ -64,7 +70,13 @@ object TraderSettingsStore {
             requestTimeoutSeconds = p.getInt("timeout_seconds", 10).coerceIn(1, 60),
             maxMarketsPerBatch = p.getInt("markets_per_batch", 10).coerceIn(1, 50),
             maxSpreadPercent = p.getFloat("max_spread_percent", 1f).coerceIn(0.1f, 10f),
-            paperFeePercent = p.getFloat("paper_fee_percent", 0f).coerceIn(0f, 2f)
+            paperFeePercent = p.getFloat("paper_fee_percent", 0f).coerceIn(0f, 2f),
+            strategyFmcEnabled = p.getBoolean("strategy_fmc_enabled", true),
+            strategyFvgEnabled = p.getBoolean("strategy_fvg_enabled", true),
+            strategyLiquiditySweepEnabled = p.getBoolean("strategy_liquidity_sweep_enabled", true),
+            strategyOrderBlockEnabled = p.getBoolean("strategy_order_block_enabled", true),
+            strategyMicroScalperEnabled = p.getBoolean("strategy_micro_scalper_enabled", true),
+            minimumStrategyAgreement = p.getInt("minimum_strategy_agreement", 2).coerceIn(1, 5)
         )
     }
 
@@ -78,6 +90,12 @@ object TraderSettingsStore {
             .putInt("markets_per_batch", settings.maxMarketsPerBatch.coerceIn(1, 50))
             .putFloat("max_spread_percent", settings.maxSpreadPercent.coerceIn(0.1f, 10f))
             .putFloat("paper_fee_percent", settings.paperFeePercent.coerceIn(0f, 2f))
+            .putBoolean("strategy_fmc_enabled", settings.strategyFmcEnabled)
+            .putBoolean("strategy_fvg_enabled", settings.strategyFvgEnabled)
+            .putBoolean("strategy_liquidity_sweep_enabled", settings.strategyLiquiditySweepEnabled)
+            .putBoolean("strategy_order_block_enabled", settings.strategyOrderBlockEnabled)
+            .putBoolean("strategy_micro_scalper_enabled", settings.strategyMicroScalperEnabled)
+            .putInt("minimum_strategy_agreement", settings.minimumStrategyAgreement.coerceIn(1, 5))
             .apply()
     }
 
@@ -276,6 +294,67 @@ fun SettingsScreen(
                     onValueChange = {
                         updateSettings(settings.copy(maxSpreadPercent = it.coerceIn(0.1f, 10f)))
                     }
+                )
+            }
+
+            SettingsSection(
+                title = if (english) "STRATEGY CONTROL" else "کنترل استراتژی‌ها",
+                subtitle = if (english) "Enable or disable each strategy independently" else "هر استراتژی را مستقل روشن یا خاموش کن",
+                dark = dark
+            ) {
+                SettingSwitch(
+                    title = if (english) "FMC" else "استراتژی FMC",
+                    description = if (english) "FMC candle setup evaluation" else "بررسی الگوی کندلی FMC",
+                    checked = settings.strategyFmcEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyFmcEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSwitch(
+                    title = if (english) "FVG" else "استراتژی FVG",
+                    description = if (english) "Fair Value Gap setup evaluation" else "بررسی ناحیه عدم تعادل قیمت",
+                    checked = settings.strategyFvgEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyFvgEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSwitch(
+                    title = if (english) "Liquidity Sweep" else "جمع‌آوری نقدینگی",
+                    description = if (english) "Liquidity sweep setup evaluation" else "بررسی شکار حدضرر و نقدینگی",
+                    checked = settings.strategyLiquiditySweepEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyLiquiditySweepEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSwitch(
+                    title = if (english) "Order Block" else "اوردر بلاک",
+                    description = if (english) "Order block setup evaluation" else "بررسی نواحی سفارش",
+                    checked = settings.strategyOrderBlockEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyOrderBlockEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSwitch(
+                    title = if (english) "Micro Scalper" else "میکرو اسکالپر",
+                    description = if (english) "Short-term candle setup evaluation" else "بررسی موقعیت‌های کوتاه‌مدت",
+                    checked = settings.strategyMicroScalperEnabled,
+                    onCheckedChange = { updateSettings(settings.copy(strategyMicroScalperEnabled = it)) }
+                )
+                SectionDivider()
+                SettingSlider(
+                    title = if (english) "Minimum agreeing strategies" else "حداقل استراتژی‌های هم‌نظر",
+                    valueLabel = settings.minimumStrategyAgreement.toString(),
+                    value = settings.minimumStrategyAgreement.toFloat(),
+                    valueRange = 1f..5f,
+                    steps = 3,
+                    onValueChange = {
+                        updateSettings(settings.copy(minimumStrategyAgreement = it.toInt().coerceIn(1, 5)))
+                    }
+                )
+                Text(
+                    text = if (english) {
+                        "Only enabled strategies are evaluated. If all are disabled, the analysis reports that no strategy is active. Lower agreement can increase signals and risk."
+                    } else {
+                        "فقط استراتژی‌های روشن بررسی می‌شوند. اگر همه خاموش باشند، تحلیل علت را اعلام می‌کند. کاهش حدنصاب می‌تواند تعداد سیگنال‌ها و ریسک را افزایش دهد."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
