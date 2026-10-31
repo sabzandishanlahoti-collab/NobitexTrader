@@ -44,7 +44,7 @@ internal object PaperAutoTradingPolicy {
         if (!market.spreadPercent.isFinite() || market.spreadPercent < 0.0 ||
             market.spreadPercent > maxSpreadPercent
         ) return reject("Spread exceeds the configured safety limit")
-        if (!feeRate.isFinite() || feeRate !in 0.0..0.02) {
+        if (!feeRate.isFinite() || feeRate !in 0.0000000001..0.02) {
             return reject("Paper trading fee is not configured or invalid")
         }
         if (!orderBudgetIrr.isFinite() || orderBudgetIrr <= 0.0) {
