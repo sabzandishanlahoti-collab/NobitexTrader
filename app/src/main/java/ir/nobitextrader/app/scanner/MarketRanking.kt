@@ -11,7 +11,8 @@ object MarketRanking {
 
     fun rank(
         results: List<MarketScanResult>,
-        mode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY
+        mode: MarketSortMode = MarketSortMode.BALANCED_PRIORITY,
+        tradeFlowBySymbol: Map<String, PublicTradeFlowSummary> = emptyMap()
     ): List<MarketScanResult> {
         val successful = results.filter { it.success }
         val failed = results.filterNot { it.success }
@@ -46,12 +47,40 @@ object MarketRanking {
                     }
                 )
 
+            MarketSortMode.COMBINED_BUY_FLOW_HIGH_TO_LOW ->
+                rankCombinedBuyFlow(successful, tradeFlowBySymbol)
+
             MarketSortMode.BALANCED_PRIORITY ->
                 rankBalanced(successful)
         }
 
         // Kotlin's sorted operations are stable: equal metrics retain scan order.
         return ranked + failed
+    }
+
+    private fun rankCombinedBuyFlow(
+        results: List<MarketScanResult>,
+        flows: Map<String, PublicTradeFlowSummary>
+    ): List<MarketScanResult> {
+        val withRealTrades = results.filter { result ->
+            flows[result.symbol]?.let { flow ->
+                flow.buyCount + flow.sellCount > 0 &&
+                    flow.buyQuoteVolume.isFinite() && flow.buyQuoteVolume >= 0.0 &&
+                    flow.sellQuoteVolume.isFinite() && flow.sellQuoteVolume >= 0.0
+            } == true
+        }
+        val withoutTradeData = results.filterNot { it in withRealTrades }
+        val ranked = withRealTrades.sortedByDescending { result ->
+            val flow = flows.getValue(result.symbol)
+            val depthTotal = result.bidLiquidityTop5 + result.askLiquidityTop5
+            val tradeTotal = flow.buyQuoteVolume + flow.sellQuoteVolume
+            val depthShare = if (depthTotal.isFinite() && depthTotal > 0.0)
+                result.bidLiquidityTop5 / depthTotal else 0.0
+            val tradeShare = if (tradeTotal.isFinite() && tradeTotal > 0.0)
+                flow.buyQuoteVolume / tradeTotal else 0.0
+            (depthShare.coerceIn(0.0, 1.0) + tradeShare.coerceIn(0.0, 1.0)) / 2.0
+        }
+        return ranked + withoutTradeData
     }
 
     private fun rankBalanced(
