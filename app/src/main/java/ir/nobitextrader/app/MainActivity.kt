@@ -276,14 +276,44 @@ private fun DashboardScreen(
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
-                        Text(if (english) "▶ START" else "▶ شروع", fontSize = 11.sp)
+                    Button(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.weight(1f),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF168A45),
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFF168A45),
+                            disabledContentColor = Color.White
+                        )
+                    ) {
+                        Text("START", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
-                    OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
-                        Text(if (english) "Ⅱ STOP" else "Ⅱ توقف", fontSize = 11.sp)
+                    Button(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.weight(1f),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFFDADA),
+                            contentColor = Color(0xFF9E4141),
+                            disabledContainerColor = Color(0xFFFFDADA),
+                            disabledContentColor = Color(0xFF9E4141)
+                        )
+                    ) {
+                        Text("STOP", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
-                    OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.weight(1f)) {
-                        Text(if (english) "✕ KILL" else "✕ قطع اضطراری", fontSize = 11.sp)
+                    Button(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.weight(1f),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFB71C1C),
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFFB71C1C),
+                            disabledContentColor = Color.White
+                        )
+                    ) {
+                        Text("KILL", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                     }
                 }
                 Text(
@@ -378,19 +408,31 @@ private fun DashboardScreen(
                         if (english) {
                             "Valid books: ${scannerState.successfulCount}   •   Failed: ${scannerState.failedCount}"
                         } else {
-                            "دفتر سفارش معتبر: ${scannerState.successfulCount}   •   ناموفق: ${scannerState.failedCount}"
+                            "بازارهای دارای دفتر سفارش معتبر: ${scannerState.successfulCount}   •   ناموفق: ${scannerState.failedCount}"
                         },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(if (english) "SYMBOL" else "نماد", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+                        Text(if (english) "LAST PRICE (IRR)" else "آخرین قیمت (ریال)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+                        Text(if (english) "SPREAD" else "اختلاف", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+                    }
                     scannerState.results
                         .asSequence()
-                        .filter { it.success }
-                        .take(3)
+                        .filter { it.success && it.lastPrice.isFinite() && it.lastPrice > 0.0 }
+                        .take(10)
                         .forEach { result ->
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     result.symbol,
@@ -399,10 +441,15 @@ private fun DashboardScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    (if (english) "Spread " else "اختلاف ") +
-                                        String.format(Locale.US, "%.3f%%", result.spreadPercent),
+                                    String.format(Locale.US, "%,.0f", result.lastPrice),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    String.format(Locale.US, "%.3f%%", result.spreadPercent),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp
+                                    fontSize = 10.sp
                                 )
                             }
                         }
