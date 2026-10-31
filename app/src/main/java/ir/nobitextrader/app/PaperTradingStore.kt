@@ -20,7 +20,7 @@ internal object PaperTradingStore {
         val tj=JSONArray(p.getString("trades","[]"))
         val positions=buildList { for(i in 0 until pj.length()){val x=pj.getJSONObject(i);add(PaperPosition(x.getString("symbol"),x.getDouble("quantity"),x.getDouble("averageEntry")))} }
         val trades=buildList { for(i in 0 until tj.length()){val x=tj.getJSONObject(i);add(PaperTrade(x.getString("id"),x.getString("side"),x.getString("symbol"),x.getDouble("quantity"),x.getDouble("price"),x.getDouble("total"),x.getLong("timestamp")))} }
-        return PaperPortfolio(p.getFloat("cash",INITIAL_CASH.toFloat()).toDouble(),positions,trades)
+        return PaperPortfolio((p.getString("cash",INITIAL_CASH.toString()) ?: INITIAL_CASH.toString()).toDouble(),positions,trades)
     }
     @Synchronized fun execute(context:Context,side:String,symbol:String,quantity:Double,price:Double):PaperPortfolio {
         require(side=="BUY"||side=="SELL") { "Invalid side" }
@@ -43,7 +43,7 @@ internal object PaperTradingStore {
         val trades=(listOf(trade)+old.trades).take(2000)
         val pj=JSONArray().apply{positions.forEach{put(JSONObject().put("symbol",it.symbol).put("quantity",it.quantity).put("averageEntry",it.averageEntry))}}
         val tj=JSONArray().apply{trades.forEach{put(JSONObject().put("id",it.id).put("side",it.side).put("symbol",it.symbol).put("quantity",it.quantity).put("price",it.price).put("total",it.total).put("timestamp",it.timestamp))}}
-        check(context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putFloat("cash",cash.toFloat()).putString("positions",pj.toString()).putString("trades",tj.toString()).commit()) { "Could not save virtual transaction" }
+        check(context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putString("cash",cash.toString()).putString("positions",pj.toString()).putString("trades",tj.toString()).commit()) { "Could not save virtual transaction" }
         return PaperPortfolio(cash,positions,trades)
     }
 }
