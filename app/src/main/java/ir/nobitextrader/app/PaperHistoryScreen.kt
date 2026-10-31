@@ -56,7 +56,7 @@ internal fun PaperHistoryScreen(english: Boolean) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    if (english) "CUMULATIVE REALIZED P/L • GROSS" else "سود/زیان تحقق‌یافته کل • ناخالص",
+                    if (english) "CUMULATIVE REALIZED P/L • NET OF RECORDED FEES" else "سود/زیان تحقق‌یافته کل • پس از کسر کارمزدهای ثبت‌شده",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp
                 )
@@ -66,7 +66,7 @@ internal fun PaperHistoryScreen(english: Boolean) {
                     fontSize = 22.sp
                 )
                 Text(
-                    if (english) "Fees are not deducted." else "کارمزد از این عدد کسر نشده است.",
+                    if (english) "Current trades include configured fees; legacy trades may not." else "معاملات جدید شامل کارمزد تنظیم‌شده‌اند؛ معاملات قدیمی ممکن است بدون کارمزد باشند.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 9.sp
                 )
@@ -151,6 +151,11 @@ internal fun PaperHistoryScreen(english: Boolean) {
                                     color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 10.sp
                                 )
+                                Text(
+                                    String.format(Locale.US, "Fee: %,.0f IRR", trade.feeAmount),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 9.sp
+                                )
                                 if (isSell) {
                                     Text(
                                         String.format(Locale.US, "%+,.0f IRR", trade.realizedPnl),
@@ -165,7 +170,7 @@ internal fun PaperHistoryScreen(english: Boolean) {
             }
         }
         Text(
-            if (english) "Win rate is calculated from recorded sell transactions only. Legacy sells without stored P/L may appear as zero. This is not a live-execution history." else "درصد برد فقط از فروش‌های ثبت‌شده محاسبه می‌شود. فروش‌های قدیمی که سودوزیانشان ذخیره نشده ممکن است صفر دیده شوند. این تاریخچه مربوط به اجرای واقعی سفارش نیست.",
+            if (english) "Win rate is calculated from recorded sell transactions only. Legacy trades recorded before fee tracking do not include historical fees; their old P/L is not retroactively adjusted. This is not a live-execution history." else "درصد برد فقط از فروش‌های ثبت‌شده محاسبه می‌شود. معاملات قدیمی پیش از ثبت کارمزد، بدون کسر کارمزد تاریخی باقی می‌مانند و به‌صورت عطف‌به‌ماسبق اصلاح نمی‌شوند. این تاریخچه مربوط به اجرای واقعی سفارش نیست.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 9.sp
         )
