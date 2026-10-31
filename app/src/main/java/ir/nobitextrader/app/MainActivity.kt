@@ -56,6 +56,7 @@ import ir.nobitextrader.app.data.NobitexMarketApi
 import ir.nobitextrader.app.scanner.MarketScannerScreen
 import ir.nobitextrader.app.scanner.MarketScannerUiState
 import ir.nobitextrader.app.scanner.MarketScannerViewModel
+import ir.nobitextrader.app.ui.screens.dashboard.DashboardScreen as CyberDashboardScreen
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -675,28 +676,40 @@ class MainActivity : ComponentActivity() {
                         }
 
                         AppScreen.HOME -> {
-                            DashboardScreen(
-                                english = english,
-                                marketResult = marketResult,
-                                marketLoading = marketLoading,
-                                marketError = marketError,
-                                scannerState = scannerState,
-                                onOpenSettings = { screen = AppScreen.SETTINGS },
-                                onOpenScanner = { screen = AppScreen.SCANNER },
-                                onScanMarkets = { scannerViewModel.scanMarkets() },
-                                onRefreshMarket = {
-                                    scope.launch {
-                                        marketLoading = true
-                                        marketError = null
-                                        try {
-                                            marketResult = NobitexMarketApi.fetchMarketStats()
-                                        } catch (e: Exception) {
-                                            marketError = e.message ?: "Unknown market data error"
-                                        } finally {
-                                            marketLoading = false
-                                        }
-                                    }
-                                }
+                            CyberDashboardScreen(
+                                isConnected = false,
+                                batteryLevel = null,
+                                onSettingsClick = { screen = AppScreen.SETTINGS },
+                                tickers = emptyList(),
+                                initialCapital = "—",
+                                capitalInUse = "—",
+                                netProfit = "—",
+                                isProfitPositive = null,
+                                depositWithdraw = "—",
+                                totalTrades = "—",
+                                isBotRunning = false,
+                                isAutoTradeEnabled = false,
+                                onStartClick = {},
+                                onStopClick = {},
+                                onKillClick = {},
+                                onAutoTradeToggle = {},
+                                longPositionsCount = "—",
+                                longPositionsVolume = "—",
+                                shortPositionsCount = "—",
+                                shortPositionsVolume = "—",
+                                todayBuysCount = "—",
+                                todayBuysVolume = "—",
+                                todaySellsCount = "—",
+                                todaySellsVolume = "—",
+                                onScannerClick = { screen = AppScreen.SCANNER },
+                                onScanMarketsClick = { scannerViewModel.scanMarkets() },
+                                isScanning = scannerState.isScanning,
+                                scanProgressText = if (scannerState.totalCount > 0) {
+                                    "پیشرفت اسکن: ${scannerState.completedCount} / ${scannerState.totalCount}"
+                                } else {
+                                    null
+                                },
+                                engineControlsEnabled = false
                             )
                         }
                     }
