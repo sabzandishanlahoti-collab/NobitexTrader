@@ -73,7 +73,13 @@ object NobitexCandlesApi {
                 )
             }
 
-            parseResponse(body)
+            val candles = parseResponse(body)
+            CandleSeriesValidator.validate(
+                candles = candles,
+                resolution = resolution,
+                nowUnixSeconds = System.currentTimeMillis() / 1_000L
+            )
+            candles
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
