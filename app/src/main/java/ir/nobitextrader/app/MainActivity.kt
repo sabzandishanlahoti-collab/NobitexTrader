@@ -148,7 +148,7 @@ private fun DashboardScreen(
                     fontSize = 18.sp
                 )
                 Text(
-                    if (english) "A.F.A SNIPER • PERSONAL TERMINAL" else "آفا اسنایپر • ترمینال شخصی",
+                    "A.F.A SNIPER • PERSONAL TERMINAL",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
