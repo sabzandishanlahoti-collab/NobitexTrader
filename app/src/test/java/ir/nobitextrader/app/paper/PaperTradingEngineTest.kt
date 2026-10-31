@@ -44,6 +44,13 @@ class PaperTradingEngineTest {
         } catch (_: IllegalArgumentException) { }
     }
 
+    @Test fun paperEngineControlsFollowSafeTransitions() {
+        assertEquals(PaperEngineMode.RUNNING, PaperEngineControl.start(PaperEngineMode.STOPPED))
+        assertEquals(PaperEngineMode.STOPPED, PaperEngineControl.stop())
+        assertEquals(PaperEngineMode.KILLED, PaperEngineControl.kill())
+        assertEquals(PaperEngineMode.RUNNING, PaperEngineControl.start(PaperEngineMode.KILLED))
+    }
+
     @Test fun valuationMarksOpenPositionsAtBidAndIncludesExitFeeEstimate() {
         val bought = PaperTradingEngine.buy(PaperAccount.create(1_000.0), "BTCIRT", 100.0, 500.0)
         val value = PaperTradingEngine.value(bought, mapOf("BTCIRT" to 110.0))

@@ -24,7 +24,8 @@ fun ControlPanel(
     onKillClick: () -> Unit,
     onAutoTradeToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    controlsEnabled: Boolean = false
+    controlsEnabled: Boolean = false,
+    engineStatusText: String = "موتور معاملات مجازی متوقف است"
 ) {
     CyberCard(
         modifier = modifier
@@ -45,13 +46,13 @@ fun ControlPanel(
             ) {
                 Column {
                     Text(
-                        text = "تنظیمات ربات",
+                        text = "کنترل موتور معاملات مجازی",
                         color = CyberTokens.TextPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
                     Text(
-                        text = if (controlsEnabled) "معامله خودکار" else "موتور معامله هنوز آماده اجرا نیست",
+                        text = if (controlsEnabled) engineStatusText else "موتور معامله هنوز آماده اجرا نیست",
                         color = CyberTokens.TextSecondary,
                         fontSize = 11.sp
                     )

@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -57,6 +59,9 @@ import ir.nobitextrader.app.scanner.MarketScannerScreen
 import ir.nobitextrader.app.scanner.MarketScannerUiState
 import ir.nobitextrader.app.scanner.MarketScannerViewModel
 import ir.nobitextrader.app.paper.PaperTradingScreen
+import ir.nobitextrader.app.paper.PaperEngineControl
+import ir.nobitextrader.app.paper.PaperEngineControlStore
+import ir.nobitextrader.app.paper.PaperEngineMode
 import ir.nobitextrader.app.ui.screens.dashboard.DashboardScreen as CyberDashboardScreen
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -545,6 +550,10 @@ class MainActivity : ComponentActivity() {
             var settings by remember {
                 mutableStateOf(TraderSettingsStore.load(this@MainActivity))
             }
+            var engineMode by remember {
+                mutableStateOf(PaperEngineControlStore.load(this@MainActivity))
+            }
+            var showKillConfirmation by remember { mutableStateOf(false) }
 
             var screen by remember {
                 mutableStateOf(AppScreen.HOME)
@@ -701,12 +710,25 @@ class MainActivity : ComponentActivity() {
                                 isProfitPositive = null,
                                 depositWithdraw = "—",
                                 totalTrades = "—",
-                                isBotRunning = false,
-                                isAutoTradeEnabled = false,
-                                onStartClick = {},
-                                onStopClick = {},
-                                onKillClick = {},
-                                onAutoTradeToggle = {},
+                                isBotRunning = engineMode == PaperEngineMode.RUNNING,
+                                isAutoTradeEnabled = engineMode == PaperEngineMode.RUNNING,
+                                onStartClick = {
+                                    engineMode = PaperEngineControl.start(engineMode)
+                                    PaperEngineControlStore.save(this@MainActivity, engineMode)
+                                },
+                                onStopClick = {
+                                    engineMode = PaperEngineControl.stop()
+                                    PaperEngineControlStore.save(this@MainActivity, engineMode)
+                                },
+                                onKillClick = { showKillConfirmation = true },
+                                onAutoTradeToggle = { enabled ->
+                                    engineMode = if (enabled) {
+                                        PaperEngineControl.start(engineMode)
+                                    } else {
+                                        PaperEngineControl.stop()
+                                    }
+                                    PaperEngineControlStore.save(this@MainActivity, engineMode)
+                                },
                                 longPositionsCount = "—",
                                 longPositionsVolume = "—",
                                 shortPositionsCount = "—",
@@ -724,9 +746,58 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     null
                                 },
-                                engineControlsEnabled = false
+                                engineControlsEnabled = true,
+                                engineStatusText = when (engineMode) {
+                                    PaperEngineMode.RUNNING -> if (english) {
+                                        "PAPER MODE ARMED — automatic strategy execution is not connected yet"
+                                    } else {
+                                        "حالت کاغذی فعال است؛ اجرای خودکار استراتژی هنوز متصل نشده"
+                                    }
+                                    PaperEngineMode.KILLED -> if (english) {
+                                        "EMERGENCY STOP — press START to re-arm paper mode"
+                                    } else {
+                                        "توقف اضطراری فعال است؛ برای فعال‌سازی دوباره START را بزن"
+                                    }
+                                    PaperEngineMode.STOPPED -> if (english) {
+                                        "Paper engine stopped"
+                                    } else {
+                                        "موتور معاملات مجازی متوقف است"
+                                    }
+                                }
                             )
                         }
+                    }
+
+                    if (showKillConfirmation) {
+                        AlertDialog(
+                            onDismissRequest = { showKillConfirmation = false },
+                            title = {
+                                Text(if (english) "Emergency stop?" else "توقف اضطراری؟")
+                            },
+                            text = {
+                                Text(
+                                    if (english) {
+                                        "This disables paper automation controls. Open virtual positions and trade history will not be deleted or sold."
+                                    } else {
+                                        "این کار کنترل موتور مجازی را متوقف می‌کند. دارایی‌های مجازی باز نه حذف می‌شوند و نه فروخته؛ تاریخچه هم باقی می‌ماند."
+                                    }
+                                )
+                            },
+                            confirmButton = {
+                                Button(onClick = {
+                                    engineMode = PaperEngineControl.kill()
+                                    PaperEngineControlStore.save(this@MainActivity, engineMode)
+                                    showKillConfirmation = false
+                                }) {
+                                    Text(if (english) "KILL" else "تأیید توقف")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showKillConfirmation = false }) {
+                                    Text(if (english) "Cancel" else "انصراف")
+                                }
+                            }
+                        )
                     }
                 }
             }

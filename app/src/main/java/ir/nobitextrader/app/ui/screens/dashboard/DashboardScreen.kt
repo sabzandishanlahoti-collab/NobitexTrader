@@ -46,6 +46,7 @@ fun DashboardScreen(
     isScanning: Boolean = false,
     scanProgressText: String? = null,
     engineControlsEnabled: Boolean = false,
+    engineStatusText: String = "موتور معاملات مجازی متوقف است",
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -135,7 +136,8 @@ fun DashboardScreen(
                 onStopClick = onStopClick,
                 onKillClick = onKillClick,
                 onAutoTradeToggle = onAutoTradeToggle,
-                controlsEnabled = engineControlsEnabled
+                controlsEnabled = engineControlsEnabled,
+                engineStatusText = engineStatusText
             )
         }
 
