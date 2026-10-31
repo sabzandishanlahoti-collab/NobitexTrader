@@ -25,10 +25,17 @@ data class PublicTradeFlowSummary(
     val buyQuoteVolume: Double,
     val sellQuoteVolume: Double,
     val netQuoteFlow: Double,
-    val latestTradeTimeMillis: Long?
+    val latestTradeTimeMillis: Long?,
+    val fetchedAtMillis: Long
 ) {
     companion object {
-        fun from(trades: List<PublicTrade>): PublicTradeFlowSummary {
+        fun from(
+            trades: List<PublicTrade>,
+            fetchedAtMillis: Long = System.currentTimeMillis()
+        ): PublicTradeFlowSummary {
+            require(fetchedAtMillis > 0L) {
+                "Fetch timestamp must be positive"
+            }
             trades.forEachIndexed { index, trade ->
                 require(trade.timeMillis > 0L) {
                     "Public trade timestamp must be positive at index $index"
@@ -60,7 +67,8 @@ data class PublicTradeFlowSummary(
                 buyQuoteVolume = buyVolume,
                 sellQuoteVolume = sellVolume,
                 netQuoteFlow = netFlow,
-                latestTradeTimeMillis = trades.maxOfOrNull { it.timeMillis }
+                latestTradeTimeMillis = trades.maxOfOrNull { it.timeMillis },
+                fetchedAtMillis = fetchedAtMillis
             )
         }
 
