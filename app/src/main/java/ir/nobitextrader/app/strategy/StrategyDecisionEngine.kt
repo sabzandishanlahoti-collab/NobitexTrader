@@ -16,6 +16,10 @@ class StrategyDecisionEngine(
     }
 
     fun decide(batch: StrategyBatchResult): StrategyDecision {
+        if (batch.expectedStrategyCount == 0) {
+            return noTrade(batch.symbol, "No strategy is enabled")
+        }
+
         if (!batch.isInputValid) {
             return noTrade(
                 symbol = batch.symbol,
@@ -81,7 +85,7 @@ class StrategyDecisionEngine(
      */
     private fun validateBatch(batch: StrategyBatchResult): String? {
         if (batch.symbol.isBlank()) return "Market symbol cannot be blank"
-        if (batch.expectedStrategyCount < 1 ||
+        if (batch.expectedStrategyCount < 0 ||
             batch.attemptedStrategyCount < 0 ||
             batch.attemptedStrategyCount > batch.expectedStrategyCount
         ) {
