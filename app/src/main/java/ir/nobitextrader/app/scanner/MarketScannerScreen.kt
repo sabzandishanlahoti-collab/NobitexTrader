@@ -656,8 +656,8 @@ private fun MarketResultCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    DataValue("آخرین قیمت", formatNumber(result.lastPrice))
-                    DataValue("بهترین خرید", formatNumber(result.bestBid))
+                    DataValue("آخرین قیمت (ریال)", formatNumber(result.lastPrice), valueColor = MaterialTheme.colorScheme.primary)
+                    DataValue("بهترین خرید (ریال)", formatNumber(result.bestBid))
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -914,7 +914,8 @@ private fun StrategyAnalysisPanel(
 @Composable
 private fun DataValue(
     label: String,
-    value: String
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     Column(
         modifier = Modifier.padding(vertical = 2.dp),
@@ -923,9 +924,9 @@ private fun DataValue(
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         Text(
             value,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium
+            color = valueColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
         )
     }
 }
