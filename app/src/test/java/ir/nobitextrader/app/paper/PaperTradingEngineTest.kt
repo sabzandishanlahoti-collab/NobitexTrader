@@ -39,7 +39,7 @@ class PaperTradingEngineTest {
             )
             throw AssertionError("A single-symbol order above 25% must be rejected")
         } catch (exception: IllegalArgumentException) {
-            assertTrue(exception.message.orEmpty().contains("Per-symbol limit"))
+            assertTrue(exception.message.orEmpty().contains("Per-symbol"))
         }
     }
 

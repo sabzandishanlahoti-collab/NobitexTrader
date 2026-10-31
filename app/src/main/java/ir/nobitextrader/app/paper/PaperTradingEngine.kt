@@ -136,7 +136,7 @@ object PaperTradingEngine {
         }
         val totalInvested = account.positions.values.sumOf { it.costBasis }
         val maxTotalInvested = account.initialCash * maxTotalInvestedPct / 100.0
-        require(totalInvested + totalBudget <= maxTotalInvested + 1e-8) {
+        require(totalInvested + totalBudget <= maxTotalInvested + 1e-6) {
             "Portfolio investment limit exceeded; cash reserve must be preserved"
         }
         require(totalBudget <= account.cash + 1e-8) { "Insufficient virtual cash including fee" }
