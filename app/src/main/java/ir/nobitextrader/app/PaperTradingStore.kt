@@ -91,7 +91,8 @@ internal object PaperTradingStore {
         symbol: String,
         quantity: Double,
         price: Double,
-        feeRate: Double
+        feeRate: Double,
+        idempotencyKey: String? = null
     ): PaperPortfolio {
         require(side == "BUY" || side == "SELL") { "Invalid side" }
         require(symbol.isNotBlank() && quantity.isFinite() && quantity > 0.0) {
@@ -99,6 +100,14 @@ internal object PaperTradingStore {
         }
         require(price.isFinite() && price > 0.0) { "No valid market price is available" }
         require(feeRate.isFinite() && feeRate in 0.0..0.02) { "Fee rate must be between 0% and 2%" }
+
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (idempotencyKey != null) {
+            require(idempotencyKey.isNotBlank()) { "Invalid automatic signal key" }
+            require(prefs.getString("last_auto_signal_key", null) != idempotencyKey) {
+                "This confirmed candle signal was already processed."
+            }
+        }
 
         val old = load(context)
         val value = quantity * price
@@ -167,6 +176,9 @@ internal object PaperTradingStore {
             .putString("positions", positionsJson.toString())
             .putString("trades", tradesJson.toString())
             .putString("realizedPnl", cumulativeRealizedPnl.toString())
+            .apply {
+                if (idempotencyKey != null) putString("last_auto_signal_key", idempotencyKey)
+            }
             .commit()) { "Could not save virtual transaction" }
 
         return PaperPortfolio(cash, positions, trades, cumulativeRealizedPnl)
