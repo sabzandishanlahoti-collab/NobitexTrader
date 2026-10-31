@@ -182,6 +182,56 @@ fun MarketScannerScreen(
             )
         }
 
+        val scanSummary = MarketScanSummary.from(visibleResults)
+        val bidLiquidity = scanSummary.totalBidLiquidity
+        val askLiquidity = scanSummary.totalAskLiquidity
+        val liquidityDifference = bidLiquidity - askLiquidity
+        val averageSpread = scanSummary.averageSpreadPercent
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            MetricPanel(
+                title = "نقدینگی خرید ۵ سطح",
+                value = formatQuoteLiquidity(bidLiquidity),
+                modifier = Modifier.weight(1f),
+                valueColor = TerminalGreen
+            )
+            MetricPanel(
+                title = "نقدینگی فروش ۵ سطح",
+                value = formatQuoteLiquidity(askLiquidity),
+                modifier = Modifier.weight(1f),
+                valueColor = TerminalRed
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            MetricPanel(
+                title = "اختلاف نقدینگی خرید/فروش",
+                value = formatQuoteLiquidity(kotlin.math.abs(liquidityDifference)) +
+                    if (liquidityDifference >= 0.0) " +" else " -",
+                modifier = Modifier.weight(1f),
+                valueColor = if (liquidityDifference >= 0.0) TerminalGreen else TerminalRed
+            )
+            MetricPanel(
+                title = "میانگین اختلاف قیمت",
+                value = averageSpread?.let {
+                    String.format(Locale.US, "%.3f%%", it)
+                } ?: "—",
+                modifier = Modifier.weight(1f),
+                valueColor = TerminalAmber
+            )
+        }
+        Text(
+            "این ارقام نقدینگی ۵ ردیف اول دفتر سفارش بازارهای موفقِ قابل‌نمایش هستند؛ " +
+                "نه تعداد معاملات انجام‌شده، نه ورود/خروج قطعی سرمایه و نه سود حساب.",
+            color = TerminalMuted,
+            fontSize = 10.sp
+        )
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = TerminalPanel),
@@ -378,6 +428,19 @@ fun MarketScannerScreen(
                 )
             }
         }
+    }
+}
+
+private fun formatQuoteLiquidity(value: Double): String {
+    if (!value.isFinite()) return "—"
+    return when {
+        value >= 1_000_000_000.0 ->
+            String.format(Locale.US, "%.2f B", value / 1_000_000_000.0)
+        value >= 1_000_000.0 ->
+            String.format(Locale.US, "%.2f M", value / 1_000_000.0)
+        value >= 1_000.0 ->
+            String.format(Locale.US, "%.1f K", value / 1_000.0)
+        else -> String.format(Locale.US, "%.0f", value)
     }
 }
 
