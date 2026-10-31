@@ -3,9 +3,9 @@ package ir.nobitextrader.app.scanner
 /**
  * Deterministic ranking for successful market scan results.
  *
- * Balanced priority uses only live order-book measurements:
- * 50% spread quality, 25% bid depth and 25% ask depth.
- * Failed or invalid measurements are never promoted above valid markets.
+ * Invalid measurements are always placed after valid measurements.
+ * Combined flow ranking requires both a valid order book and real public
+ * trade volume; markets without recent trades remain visible but rank later.
  */
 object MarketRanking {
 
@@ -19,32 +19,31 @@ object MarketRanking {
 
         val ranked = when (mode) {
             MarketSortMode.SPREAD_LOW_TO_HIGH ->
-                successful.sortedWith(
-                    compareBy<MarketScanResult> { safeNonNegative(it.spreadPercent) }
+                rankValidFirst(
+                    successful,
+                    isValid = { it.spreadPercent.isFinite() && it.spreadPercent >= 0.0 },
+                    comparator = compareBy { it.spreadPercent }
                 )
 
             MarketSortMode.BID_LIQUIDITY_HIGH_TO_LOW ->
-                successful.sortedWith(
-                    compareByDescending<MarketScanResult> {
-                        safeNonNegative(it.bidLiquidityTop5)
-                    }
+                rankValidFirst(
+                    successful,
+                    isValid = { it.bidLiquidityTop5.isFinite() && it.bidLiquidityTop5 >= 0.0 },
+                    comparator = compareByDescending { it.bidLiquidityTop5 }
                 )
 
             MarketSortMode.ASK_LIQUIDITY_HIGH_TO_LOW ->
-                successful.sortedWith(
-                    compareByDescending<MarketScanResult> {
-                        safeNonNegative(it.askLiquidityTop5)
-                    }
+                rankValidFirst(
+                    successful,
+                    isValid = { it.askLiquidityTop5.isFinite() && it.askLiquidityTop5 >= 0.0 },
+                    comparator = compareByDescending { it.askLiquidityTop5 }
                 )
 
             MarketSortMode.BUY_PRESSURE_HIGH_TO_LOW ->
-                successful.sortedWith(
-                    compareByDescending<MarketScanResult> { result ->
-                        val bid = safeNonNegative(result.bidLiquidityTop5)
-                        val ask = safeNonNegative(result.askLiquidityTop5)
-                        val total = bid + ask
-                        if (total.isFinite() && total > 0.0) bid / total else -1.0
-                    }
+                rankValidFirst(
+                    successful,
+                    isValid = ::hasValidDepth,
+                    comparator = compareByDescending { buyDepthShare(it) }
                 )
 
             MarketSortMode.COMBINED_BUY_FLOW_HIGH_TO_LOW ->
@@ -54,33 +53,68 @@ object MarketRanking {
                 rankBalanced(successful)
         }
 
-        // Kotlin's sorted operations are stable: equal metrics retain scan order.
+        // Successful markets always remain above failed scans.
         return ranked + failed
+    }
+
+    private fun <T> rankValidFirst(
+        results: List<T>,
+        isValid: (T) -> Boolean,
+        comparator: Comparator<T>
+    ): List<T> {
+        val valid = results.filter(isValid)
+        val invalid = results.filterNot(isValid)
+        return valid.sortedWith(comparator) + invalid
     }
 
     private fun rankCombinedBuyFlow(
         results: List<MarketScanResult>,
         flows: Map<String, PublicTradeFlowSummary>
     ): List<MarketScanResult> {
-        val withRealTrades = results.filter { result ->
-            flows[result.symbol]?.let { flow ->
-                flow.buyCount + flow.sellCount > 0 &&
-                    flow.buyQuoteVolume.isFinite() && flow.buyQuoteVolume >= 0.0 &&
-                    flow.sellQuoteVolume.isFinite() && flow.sellQuoteVolume >= 0.0
-            } == true
+        val validDepth = results.filter(::hasValidDepth)
+        val invalidDepth = results.filterNot(::hasValidDepth)
+
+        val withTradeData = validDepth.filter { result ->
+            flows[result.symbol]?.let(::hasValidTradeFlow) == true
         }
-        val withoutTradeData = results.filterNot { it in withRealTrades }
-        val ranked = withRealTrades.sortedByDescending { result ->
+        val withoutTradeData = validDepth.filterNot { result ->
+            flows[result.symbol]?.let(::hasValidTradeFlow) == true
+        }
+
+        val rankedWithTrades = withTradeData.sortedByDescending { result ->
             val flow = flows.getValue(result.symbol)
-            val depthTotal = result.bidLiquidityTop5 + result.askLiquidityTop5
+            val depthShare = buyDepthShare(result)
             val tradeTotal = flow.buyQuoteVolume + flow.sellQuoteVolume
-            val depthShare = if (depthTotal.isFinite() && depthTotal > 0.0)
-                result.bidLiquidityTop5 / depthTotal else 0.0
-            val tradeShare = if (tradeTotal.isFinite() && tradeTotal > 0.0)
-                flow.buyQuoteVolume / tradeTotal else 0.0
-            (depthShare.coerceIn(0.0, 1.0) + tradeShare.coerceIn(0.0, 1.0)) / 2.0
+            val tradeBuyShare = flow.buyQuoteVolume / tradeTotal
+
+            // Equal weighting avoids allowing a single large order-book
+            // snapshot or a single large public trade to dominate alone.
+            (depthShare + tradeBuyShare) / 2.0
         }
-        return ranked + withoutTradeData
+
+        return rankedWithTrades + withoutTradeData + invalidDepth
+    }
+
+    private fun hasValidTradeFlow(flow: PublicTradeFlowSummary): Boolean {
+        if (flow.buyCount < 0 || flow.sellCount < 0) return false
+        if (flow.buyCount.toLong() + flow.sellCount.toLong() <= 0L) return false
+        if (!flow.buyQuoteVolume.isFinite() || flow.buyQuoteVolume < 0.0) return false
+        if (!flow.sellQuoteVolume.isFinite() || flow.sellQuoteVolume < 0.0) return false
+
+        val total = flow.buyQuoteVolume + flow.sellQuoteVolume
+        return total.isFinite() && total > 0.0
+    }
+
+    private fun hasValidDepth(result: MarketScanResult): Boolean {
+        if (!result.bidLiquidityTop5.isFinite() || result.bidLiquidityTop5 < 0.0) return false
+        if (!result.askLiquidityTop5.isFinite() || result.askLiquidityTop5 < 0.0) return false
+        val total = result.bidLiquidityTop5 + result.askLiquidityTop5
+        return total.isFinite() && total > 0.0
+    }
+
+    private fun buyDepthShare(result: MarketScanResult): Double {
+        val total = result.bidLiquidityTop5 + result.askLiquidityTop5
+        return result.bidLiquidityTop5 / total
     }
 
     private fun rankBalanced(
@@ -127,7 +161,4 @@ object MarketRanking {
             result.bidLiquidityTop5 >= 0.0 &&
             result.askLiquidityTop5.isFinite() &&
             result.askLiquidityTop5 >= 0.0
-
-    private fun safeNonNegative(value: Double): Double =
-        if (value.isFinite() && value >= 0.0) value else Double.MAX_VALUE
 }
