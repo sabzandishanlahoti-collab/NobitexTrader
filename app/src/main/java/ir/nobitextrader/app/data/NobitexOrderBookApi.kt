@@ -122,7 +122,7 @@ object NobitexOrderBookApi {
 
         uniqueEntries.forEachIndexed { index, (symbol, market) ->
             try {
-                markets.add(parseSnapshot(symbol, market))
+                markets.add(parseSnapshot(symbol, market, requireLastTradePrice = false))
             } catch (_: IOException) {
                 // Ignore malformed entries and continue processing other markets.
             } finally {
@@ -208,7 +208,8 @@ object NobitexOrderBookApi {
 
     internal fun parseSnapshot(
         symbol: String,
-        root: JSONObject
+        root: JSONObject,
+        requireLastTradePrice: Boolean = true
     ): OrderBookSnapshot {
         val bids = parseLevels(
             root.optJSONArray("bids"),
@@ -230,9 +231,15 @@ object NobitexOrderBookApi {
             throw IOException("Crossed order book for $symbol")
         }
 
-        val lastPrice = readRequiredNumber(root, "lastTradePrice")
-        if (lastPrice <= 0.0) {
-            throw IOException("Invalid last trade price for $symbol")
+        val lastPrice = try {
+            readRequiredNumber(root, "lastTradePrice").also {
+                if (it <= 0.0) {
+                    throw IOException("Invalid last trade price for $symbol")
+                }
+            }
+        } catch (e: IOException) {
+            if (requireLastTradePrice) throw e
+            Double.NaN
         }
 
         val lastUpdate = root.optLong("lastUpdate", 0L)
