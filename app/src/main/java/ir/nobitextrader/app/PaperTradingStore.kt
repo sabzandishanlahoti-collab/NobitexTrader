@@ -19,7 +19,8 @@ internal data class PaperTrade(
     val price: Double,
     val total: Double,
     val timestamp: Long,
-    val realizedPnl: Double = 0.0
+    val realizedPnl: Double = 0.0,
+    val feeAmount: Double = 0.0
 )
 
 internal data class PaperPortfolio(
@@ -69,7 +70,8 @@ internal object PaperTradingStore {
                         price = item.getDouble("price"),
                         total = item.getDouble("total"),
                         timestamp = item.getLong("timestamp"),
-                        realizedPnl = item.optDouble("realizedPnl", 0.0)
+                        realizedPnl = item.optDouble("realizedPnl", 0.0),
+                        feeAmount = item.optDouble("feeAmount", 0.0)
                     )
                 )
             }
@@ -95,17 +97,23 @@ internal object PaperTradingStore {
         side: String,
         symbol: String,
         quantity: Double,
-        price: Double
+        price: Double,
+        feeRatePercent: Double
     ): PaperPortfolio {
         require(side == "BUY" || side == "SELL") { "Invalid side" }
         require(symbol.isNotBlank() && quantity.isFinite() && quantity > 0.0) {
             "Enter a valid quantity"
         }
         require(price.isFinite() && price > 0.0) { "No valid market price is available" }
+        require(feeRatePercent.isFinite() && feeRatePercent > 0.0 && feeRatePercent <= 2.0) {
+            "Configure a valid paper fee rate in Settings (0.01% to 2.00%)"
+        }
 
         val old = load(context)
         val value = quantity * price
         require(value.isFinite() && value > 0.0) { "Invalid order value" }
+        val feeAmount = value * feeRatePercent / 100.0
+        require(feeAmount.isFinite() && feeAmount >= 0.0) { "Invalid fee amount" }
 
         val oldQuantity = old.quantity(symbol)
         val oldAverage = old.averageEntry(symbol)
@@ -116,19 +124,19 @@ internal object PaperTradingStore {
         val tradeRealizedPnl: Double
 
         if (side == "BUY") {
-            require(value <= old.cash) { "Insufficient virtual cash" }
-            cash = old.cash - value
+            require(value + feeAmount <= old.cash) { "Insufficient virtual cash including fee" }
+            cash = old.cash - value - feeAmount
             newQuantity = oldQuantity + quantity
-            newAverage = ((oldQuantity * oldAverage) + value) / newQuantity
+            newAverage = ((oldQuantity * oldAverage) + value + feeAmount) / newQuantity
             tradeRealizedPnl = 0.0
         } else {
             require(quantity <= oldQuantity + 1e-12) {
                 "Insufficient virtual position"
             }
-            cash = old.cash + value
+            cash = old.cash + value - feeAmount
             newQuantity = (oldQuantity - quantity).coerceAtLeast(0.0)
             newAverage = if (newQuantity <= 1e-12) 0.0 else oldAverage
-            tradeRealizedPnl = (price - oldAverage) * quantity
+            tradeRealizedPnl = (price - oldAverage) * quantity - feeAmount
         }
 
         val positions = old.positions.filterNot { it.symbol == symbol }.toMutableList()
@@ -144,7 +152,8 @@ internal object PaperTradingStore {
             price = price,
             total = value,
             timestamp = System.currentTimeMillis(),
-            realizedPnl = tradeRealizedPnl
+            realizedPnl = tradeRealizedPnl,
+            feeAmount = feeAmount
         )
         val trades = (listOf(trade) + old.trades).take(2000)
         val cumulativeRealizedPnl = old.realizedPnl + tradeRealizedPnl
@@ -171,6 +180,7 @@ internal object PaperTradingStore {
                         .put("total", it.total)
                         .put("timestamp", it.timestamp)
                         .put("realizedPnl", it.realizedPnl)
+                        .put("feeAmount", it.feeAmount)
                 )
             }
         }
