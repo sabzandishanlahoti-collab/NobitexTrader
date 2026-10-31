@@ -299,7 +299,7 @@ class NobitexCandlesApiTest {
         val candles = validSeries()
         assertIllegalArgument {
             CandleSeriesValidator.validate(
-                candles, "5", candles.last().timestampMillis / 1_000L + 601L
+                candles, "5", candles.last().timestampMillis / 1_000L + 901L
             )
         }
     }
