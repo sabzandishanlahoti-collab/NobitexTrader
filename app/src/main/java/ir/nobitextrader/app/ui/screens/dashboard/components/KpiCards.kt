@@ -22,11 +22,17 @@ fun TopKpiRow(
     initialCapital: String,
     capitalInUse: String,
     netProfit: String,
-    isProfitPositive: Boolean,
+    isProfitPositive: Boolean?,
     depositWithdraw: String,
     totalTrades: String,
     modifier: Modifier = Modifier
 ) {
+    val profitColor = when (isProfitPositive) {
+        true -> CyberTokens.NeonGreen
+        false -> CyberTokens.NeonRed
+        null -> CyberTokens.TextSecondary
+    }
+
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -53,8 +59,8 @@ fun TopKpiRow(
                 title = "سود خالص",
                 value = netProfit,
                 icon = Icons.Default.TrendingUp,
-                iconColor = if (isProfitPositive) CyberTokens.NeonGreen else CyberTokens.NeonRed,
-                valueColor = if (isProfitPositive) CyberTokens.NeonGreen else CyberTokens.NeonRed
+                iconColor = profitColor,
+                valueColor = profitColor
             )
         }
         item {
