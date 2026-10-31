@@ -1,5 +1,7 @@
 package ir.nobitextrader.app.data
 
+import ir.nobitextrader.app.strategy.Candle
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -257,6 +259,102 @@ class NobitexCandlesApiTest {
 
         assertEquals(1, candles.size)
         assertEquals(0.0, candles.single().volume, 0.0)
+    }
+
+
+    @Test
+    fun candleSeriesValidatorAcceptsFreshContinuousHistory() {
+        val candles = validSeries()
+        CandleSeriesValidator.validate(
+            candles = candles,
+            resolution = "5",
+            nowUnixSeconds = candles.last().timestampMillis / 1_000L + 300L
+        )
+    }
+
+    @Test
+    fun candleSeriesValidatorRejectsDuplicateTimestamps() {
+        val candles = validSeries().toMutableList()
+        candles[10] = candles[10].copy(timestampMillis = candles[9].timestampMillis)
+        assertIllegalArgument {
+            CandleSeriesValidator.validate(
+                candles, "5", candles.last().timestampMillis / 1_000L + 300L
+            )
+        }
+    }
+
+    @Test
+    fun candleSeriesValidatorRejectsMissingIntervals() {
+        val candles = validSeries().toMutableList()
+        candles[10] = candles[10].copy(timestampMillis = candles[10].timestampMillis + 300_000L)
+        assertIllegalArgument {
+            CandleSeriesValidator.validate(
+                candles, "5", candles.last().timestampMillis / 1_000L + 600L
+            )
+        }
+    }
+
+    @Test
+    fun candleSeriesValidatorRejectsStaleLatestCandle() {
+        val candles = validSeries()
+        assertIllegalArgument {
+            CandleSeriesValidator.validate(
+                candles, "5", candles.last().timestampMillis / 1_000L + 601L
+            )
+        }
+    }
+
+    @Test
+    fun candleSeriesValidatorRejectsStillOpenLatestCandle() {
+        val candles = validSeries()
+        assertIllegalArgument {
+            CandleSeriesValidator.validate(
+                candles, "5", candles.last().timestampMillis / 1_000L + 299L
+            )
+        }
+    }
+
+    @Test
+    fun candleSeriesValidatorRejectsInsufficientHistory() {
+        val candles = validSeries().take(19)
+        assertIllegalArgument {
+            CandleSeriesValidator.validate(
+                candles, "5", candles.last().timestampMillis / 1_000L + 300L
+            )
+        }
+    }
+
+    @Test
+    fun candleSeriesValidatorRejectsUnsupportedResolution() {
+        val candles = validSeries()
+        assertIllegalArgument {
+            CandleSeriesValidator.validate(
+                candles, "7", candles.last().timestampMillis / 1_000L + 300L
+            )
+        }
+    }
+
+    private fun validSeries(): List<Candle> {
+        val firstTimestampSeconds = 1_700_000_000L
+        return List(20) { index ->
+            Candle(
+                timestampMillis = (firstTimestampSeconds + index * 300L) * 1_000L,
+                open = 100.0,
+                high = 102.0,
+                low = 99.0,
+                close = 101.0,
+                volume = 10.0
+            )
+        }
+    }
+
+    private fun assertIllegalArgument(block: () -> Unit) {
+        try {
+            block()
+            fail("Expected IllegalArgumentException")
+        } catch (_: IllegalArgumentException) {
+            // Expected validation failure.
+        }
     }
 
 }
