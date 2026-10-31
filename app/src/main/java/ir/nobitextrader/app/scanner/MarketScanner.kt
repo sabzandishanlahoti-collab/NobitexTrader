@@ -12,6 +12,7 @@ enum class MarketSortMode {
     BID_LIQUIDITY_HIGH_TO_LOW,
     ASK_LIQUIDITY_HIGH_TO_LOW,
     BUY_PRESSURE_HIGH_TO_LOW,
+    COMBINED_BUY_FLOW_HIGH_TO_LOW,
     BALANCED_PRIORITY
 }
 
@@ -137,8 +138,9 @@ object MarketScanner {
 
     fun sortResults(
         results: List<MarketScanResult>,
-        mode: MarketSortMode
-    ): List<MarketScanResult> = MarketRanking.rank(results, mode)
+        mode: MarketSortMode,
+        tradeFlowBySymbol: Map<String, PublicTradeFlowSummary> = emptyMap()
+    ): List<MarketScanResult> = MarketRanking.rank(results, mode, tradeFlowBySymbol)
 
     fun successfulCount(results: List<MarketScanResult>): Int =
         results.count { it.success }
