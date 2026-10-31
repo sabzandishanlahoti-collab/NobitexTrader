@@ -46,7 +46,8 @@ data class TraderSettings(
     val refreshSeconds: Int = 30,
     val requestTimeoutSeconds: Int = 10,
     val maxMarketsPerBatch: Int = 10,
-    val maxSpreadPercent: Float = 1f
+    val maxSpreadPercent: Float = 1f,
+    val paperFeePercent: Float = 0f
 )
 
 object TraderSettingsStore {
@@ -62,7 +63,8 @@ object TraderSettingsStore {
             refreshSeconds = p.getInt("refresh_seconds", 30).coerceIn(5, 3600),
             requestTimeoutSeconds = p.getInt("timeout_seconds", 10).coerceIn(1, 60),
             maxMarketsPerBatch = p.getInt("markets_per_batch", 10).coerceIn(1, 50),
-            maxSpreadPercent = p.getFloat("max_spread_percent", 1f).coerceIn(0.1f, 10f)
+            maxSpreadPercent = p.getFloat("max_spread_percent", 1f).coerceIn(0.1f, 10f),
+            paperFeePercent = p.getFloat("paper_fee_percent", 0f).coerceIn(0f, 2f)
         )
     }
 
@@ -75,6 +77,7 @@ object TraderSettingsStore {
             .putInt("timeout_seconds", settings.requestTimeoutSeconds.coerceIn(1, 60))
             .putInt("markets_per_batch", settings.maxMarketsPerBatch.coerceIn(1, 50))
             .putFloat("max_spread_percent", settings.maxSpreadPercent.coerceIn(0.1f, 10f))
+            .putFloat("paper_fee_percent", settings.paperFeePercent.coerceIn(0f, 2f))
             .apply()
     }
 
@@ -273,6 +276,32 @@ fun SettingsScreen(
                     onValueChange = {
                         updateSettings(settings.copy(maxSpreadPercent = it.coerceIn(0.1f, 10f)))
                     }
+                )
+            }
+
+            SettingsSection(
+                title = if (english) "PAPER TRADING COSTS" else "هزینه‌های معاملات مجازی",
+                subtitle = if (english) "Set the fee rate from your current exchange fee tier" else "نرخ کارمزد را مطابق سطح کارمزدی فعلی حسابت وارد کن",
+                dark = dark
+            ) {
+                SettingSlider(
+                    title = if (english) "Fee per side" else "کارمزد هر سمت معامله",
+                    valueLabel = String.format(Locale.US, "%.2f%%", settings.paperFeePercent),
+                    value = settings.paperFeePercent,
+                    valueRange = 0f..2f,
+                    steps = 199,
+                    onValueChange = {
+                        updateSettings(settings.copy(paperFeePercent = it.coerceIn(0f, 2f)))
+                    }
+                )
+                Text(
+                    if (settings.paperFeePercent <= 0f) {
+                        if (english) "Fee is not configured. Paper BUY/SELL will remain locked." else "کارمزد تنظیم نشده؛ خرید و فروش مجازی قفل می‌ماند."
+                    } else {
+                        if (english) "Applied to both BUY and SELL notional. Enter the rate shown for your account; this is not fetched from Nobitex." else "این نرخ هم برای خرید و هم فروش اعمال می‌شود. نرخ حساب خودت را وارد کن؛ برنامه آن را از نوبیتکس دریافت نمی‌کند."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
