@@ -28,15 +28,36 @@ data class PublicTradeFlowSummary(
     val latestTradeTimeMillis: Long?
 ) {
     companion object {
-        fun from(trades: List<PublicTrade>): PublicTradeFlowSummary = PublicTradeFlowSummary(
-            buyCount = trades.count { it.type == TradeSide.BUY },
-            sellCount = trades.count { it.type == TradeSide.SELL },
-            buyQuoteVolume = trades.filter { it.type == TradeSide.BUY }.sumOf { it.quoteVolume },
-            sellQuoteVolume = trades.filter { it.type == TradeSide.SELL }.sumOf { it.quoteVolume },
-            netQuoteFlow = trades.filter { it.type == TradeSide.BUY }.sumOf { it.quoteVolume } -
-                trades.filter { it.type == TradeSide.SELL }.sumOf { it.quoteVolume },
-            latestTradeTimeMillis = trades.maxOfOrNull { it.timeMillis }
-        )
+        fun from(trades: List<PublicTrade>): PublicTradeFlowSummary {
+            val buys = trades.filter { it.type == TradeSide.BUY }
+            val sells = trades.filter { it.type == TradeSide.SELL }
+            val buyVolume = sumFiniteQuoteVolume(buys)
+            val sellVolume = sumFiniteQuoteVolume(sells)
+            val netFlow = buyVolume - sellVolume
+
+            require(netFlow.isFinite()) {
+                "Public trade net quote flow is non-finite"
+            }
+
+            return PublicTradeFlowSummary(
+                buyCount = buys.size,
+                sellCount = sells.size,
+                buyQuoteVolume = buyVolume,
+                sellQuoteVolume = sellVolume,
+                netQuoteFlow = netFlow,
+                latestTradeTimeMillis = trades.maxOfOrNull { it.timeMillis }
+            )
+        }
+
+        private fun sumFiniteQuoteVolume(trades: List<PublicTrade>): Double {
+            return trades.fold(0.0) { total, trade ->
+                val next = total + trade.quoteVolume
+                require(next.isFinite()) {
+                    "Public trade quote volume total is non-finite"
+                }
+                next
+            }
+        }
     }
 }
 
