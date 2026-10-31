@@ -106,29 +106,19 @@ internal object PaperTradingStore {
         val fee = value * feeRate
         require(fee.isFinite()) { "Invalid fee amount" }
 
-        val oldQuantity = old.quantity(symbol)
-        val oldAverage = old.averageEntry(symbol)
-        val cash: Double
-        val newQuantity: Double
-        val newAverage: Double
-        val tradeRealizedPnl: Double
-
-        if (side == "BUY") {
-            val debit = value + fee
-            require(debit.isFinite() && debit <= old.cash) { "Insufficient virtual cash including fee" }
-            cash = old.cash - debit
-            newQuantity = oldQuantity + quantity
-            // Buy fee is capitalized into the position's average cost.
-            newAverage = ((oldQuantity * oldAverage) + value + fee) / newQuantity
-            tradeRealizedPnl = 0.0
-        } else {
-            require(quantity <= oldQuantity + 1e-12) { "Insufficient virtual position" }
-            cash = old.cash + value - fee
-            newQuantity = (oldQuantity - quantity).coerceAtLeast(0.0)
-            newAverage = if (newQuantity <= 1e-12) 0.0 else oldAverage
-            // Sell fee is deducted from the realized result.
-            tradeRealizedPnl = (price - oldAverage) * quantity - fee
-        }
+        val calculation = PaperTradingMath.calculate(
+            side = side,
+            oldCash = old.cash,
+            oldQuantity = old.quantity(symbol),
+            oldAverageEntry = old.averageEntry(symbol),
+            quantity = quantity,
+            price = price,
+            feeRate = feeRate
+        )
+        val cash = calculation.cash
+        val newQuantity = calculation.quantity
+        val newAverage = calculation.averageEntry
+        val tradeRealizedPnl = calculation.realizedPnl
         require(cash.isFinite() && cash >= -1e-8) { "Invalid virtual cash balance" }
 
         val positions = old.positions.filterNot { it.symbol == symbol }.toMutableList()
