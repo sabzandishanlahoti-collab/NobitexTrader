@@ -119,3 +119,46 @@ A green GitHub Actions run proves only that the configured workflow passed for t
 
 ---
 Last checkpoint recorded: 2026-10-31.
+
+
+## 8. Baseline audit — first source inspection (2026-10-31)
+
+This is a source-level inventory, not a claim of production readiness. The latest verified checkpoint after adding this section must be recorded separately once Actions passes.
+
+### Repository structure observations
+- The Android Gradle module is `app`; its configured source namespace is `ir.nobitextrader.app`.
+- The actual launcher declared in `app/src/main/AndroidManifest.xml` is `ir.nobitextrader.app.MainActivity`, implemented at `app/src/main/java/ir/nobitextrader/app/MainActivity.kt`.
+- The recursive Git tree also contains legacy-looking or misplaced files outside the active Java source root (for example root-level `MainActivity.kt`, `app/src/main/MainActivity.kt`, and a nested `.github/workflows/.github/workflows/android.yml`). These are not the manifest-selected app entry point or the active workflow. Do not delete them until their history and intended use are understood.
+- Some paths contain the invisible WORD JOINER character U+2060 (for example `app/src/main/java/ir/nobitextrader/app⁠/data/`). Preserve exact path spelling when fetching or editing; do not normalize it accidentally.
+
+### Confirmed implemented source components
+- Public market statistics client: `data/NobitexMarketApi.kt` — read-only HTTP GET and response validation.
+- Public order-book client: `data/NobitexOrderBookApi.kt` — single-symbol and all-order-books parsing, validation of levels and crossed books.
+- Public recent trades client: `data/NobitexTradesApi.kt` — read-only recent public trades; source comments explicitly state that trades do not identify an account/person.
+- Public candle client: `data⁠/NobitexCandlesApi.kt` — read-only OHLCV history parser.
+- Scanner: `scanner/MarketScanner.kt`, `MarketScannerViewModel.kt`, filtering/ranking/refresh policies and UI. The view model starts/stops auto-refresh, streams scan results, requests recent public trades, and calls the strategy analysis coordinator.
+- Strategy research: multiple strategy implementations (FMC, FVG, liquidity sweep, order block, scalping, whale pressure), shared strategy orchestration/decision analysis, and a deterministic OHLC backtest engine.
+- Risk research: `risk/RiskEngine.kt`, risk event models/serializer/store and persistent file-backed risk event history.
+- Test tree includes unit tests for API parsers, scanner, strategy modules, backtest, and risk components. The configured workflow runs `gradle :app:testDebugUnitTest`, then `:app:assembleDebug`.
+
+### Important integration boundaries / gaps established by source inspection
+- Dashboard explicitly labels the app READ ONLY. Capital, position, net-profit, deposit, and withdrawal cards display em-dash placeholders; open positions and trade history are empty panels. The UI explicitly says these require verified authenticated exchange data.
+- No authenticated account balance/deposit/withdrawal/order integration was found in the inspected app manifest, Gradle dependencies, dashboard, or public API clients. Treat private account integration and live order execution as **Not started / not verified**, not implemented.
+- The public trades endpoint provides public market prints, not the identity, balance, or positions of the trader behind each print. Public buy/sell flow summaries must never be described as identified whale/account activity.
+- The risk engine is a standalone decision component whose request requires account equity, free capital, open risk, stop, costs, spread, data-validity, liquidity, and kill-switch inputs. Source inspection has not established a production order pipeline that calls it before submitting orders. Treat risk-to-execution wiring as unimplemented until call sites and end-to-end tests prove otherwise.
+- Backtest is explicitly research-only and does not submit orders. It uses a caller-supplied signal callback; a green unit test/build does not establish strategy profitability or exchange execution.
+- `NobitexOrderBookApi.fetchAll` validates `maxMarkets` but documents that the parameter does not limit returned markets. `MarketScanner.scanAll` processes every valid order book returned by the all endpoint. UI settings named “markets per batch” therefore need an integration/semantics review before being represented as a cap on all-market scanning.
+- Dashboard market snapshot currently loads a BTC/IRT public market summary separately from the scanner. The dashboard account cards are not connected to authenticated account data.
+- The active workflow builds a **Debug APK** and uploads it as an artifact. It does not currently create a signed release APK/AAB or GitHub Release.
+
+### Audit follow-up required before feature implementation
+1. Trace the entire scanner-to-strategy path, candle-window selection, stale-data checks, and all relevant UI state transitions.
+2. Verify exact current Nobitex endpoint contracts, symbol units/quoting conventions, timestamp units, all-order-book behavior, and rate limits against current official documentation/live fixtures.
+3. Determine which root/legacy/misplaced files are historical artifacts and plan safe cleanup only if necessary.
+4. Trace all references to `RiskEngine`, persistent risk history, and backtest entry points to prove whether they are reachable from app UI or only isolated/tested classes.
+5. Audit all strategy formulas, thresholds, candle requirements, and tests before tuning or claiming signal quality.
+6. Add an explicit feature matrix with status labels and integration evidence. Do not infer completion from filenames or class existence.
+
+### Verified build checkpoint after the audit-document commit
+- Commit: to be filled after this documentation commit is created and its exact-SHA Actions run succeeds.
+- Workflow status: pending verification.
