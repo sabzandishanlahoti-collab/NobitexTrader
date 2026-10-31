@@ -28,8 +28,7 @@ class StrategyAnalysisCoordinator(
         )
     },
     strategies: List<TradingStrategy> = defaultStrategies(),
-    private val decisionEngineFactory: (Int) -> StrategyDecisionEngine =
-        { minimum -> StrategyDecisionEngine(minimum) }
+    private val decisionEngine: StrategyDecisionEngine? = null
 ) {
     private val registeredStrategies = strategies.toList()
 
@@ -75,7 +74,7 @@ class StrategyAnalysisCoordinator(
             symbol = symbol,
             candles = candles,
             batch = batch,
-            decision = decisionEngineFactory(minimumAgreement.coerceIn(1, 5)).decide(batch),
+            decision = (decisionEngine ?: StrategyDecisionEngine(minimumAgreement.coerceIn(1, 5))).decide(batch),
             fetchError = null
         )
     }
