@@ -246,3 +246,14 @@ The default coordinator registers five candle-only strategies, in this order:
 - Scope was limited to dashboard presentation/state reporting. Scanner algorithm, strategy logic, exchange API behavior, private account integration, and order execution were not changed.
 - Status: **Build/test verified** for this commit. This is not live API integration verification or production verification.
 - Next dashboard work should continue as one coherent dashboard-focused batch after inspecting current UI/state flow. Preserve the explicit read-only/private-account boundary documented above; do not mark dashboard complete while account data remains unavailable.
+
+## 10. Backtest stale-entry gap handling — implementation and verified tests (2026-10-31)
+
+- Fixed stale pending-entry handling in `strategy/BacktestEngine.kt`: a pending LONG/SHORT signal is now skipped when the executable next-candle open, including configured entry slippage, is already beyond its stop-loss or take-profit bracket.
+- Added/updated deterministic tests for long and short gaps through stop, gaps beyond target, and entry slippage crossing the long target.
+- The short stop-gap test was corrected to model a gap on the actual entry candle. Its earlier three-candle setup accidentally opened the short on candle 2 and tested a later stop-out on candle 3; that behavior is separately covered by `shortGapThroughStopUsesWorseOpeningPrice`.
+- Verified branch-head commit: `042cf3e5574d97a634c21003981688bdfb243343`.
+- Verified workflow: Android APK Build and Tests, run #336 — **success**.
+- Workflow URL: https://github.com/sabzandishanlahoti-collab/NobitexTrader/actions/runs/41202289246
+- Scope is backtest correctness and unit-test/build verification only. This does not verify live execution, exchange integration, or strategy profitability.
+
